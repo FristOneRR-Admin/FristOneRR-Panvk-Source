@@ -2259,10 +2259,6 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
 static void
 v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
 {
-   fprintf(stderr,
-           "[V9-DRAW] enter prim=%d vertex_count=%u instance_count=%u first_vertex=%u",
-           info->prim, info->vertex.count, info->instance.count,
-           info->vertex.base);
    const struct panvk_shader_variant *vs =
       panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
    if (!vs || !panvk_priv_mem_check_alloc(vs->spds.pos_triangles))
@@ -2295,7 +2291,6 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (result != VK_SUCCESS)
       return;
    result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, 0);
-   fprintf(stderr, "[V9-DRAW] tiler_context result=%d", result);
    if (result != VK_SUCCESS)
       return;
 
@@ -2343,10 +2338,6 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    result = v9_prepare_blend_zsd(cmdbuf, fs, &blend_gpu, &zsd_gpu);
    if (result != VK_SUCCESS)
       return;
-   fprintf(stderr,
-           "[V9-DRAW] emit malloc vertex job blend=0x%llx zsd=0x%llx",
-           (unsigned long long)blend_gpu,
-           (unsigned long long)zsd_gpu);
    result = v9_emit_malloc_vertex_job(cmdbuf, info, vs, fs, blend_gpu, zsd_gpu);
    if (result != VK_SUCCESS)
       return;
