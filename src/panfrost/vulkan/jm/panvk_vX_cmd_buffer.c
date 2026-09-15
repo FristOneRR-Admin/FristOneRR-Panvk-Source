@@ -125,10 +125,6 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
    if (batch->tls.cpu)
       GENX(pan_emit_tls)(&batch->tlsinfo, batch->tls.cpu);
 
-#if PAN_ARCH != 9
-   /* TODO(v9): framebuffer/FBD path not yet implemented for arch 9 (no
-    * legacy BO-tracking fields, no v10+ FBD/tiler-command-stream fields
-    * either) -- stubbed out, compute-only for now. */
    if (batch->fb.desc.cpu &&
        (cmdbuf->cur_batch->vtc_jc.first_tiler ||
         cmdbuf->state.gfx.render.fb.needs_store)) {
@@ -203,7 +199,6 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
       /* We've now done the load.  Everything from now on should spill */
       cmdbuf->state.gfx.render.fb.needs_load = false;
    }
-#endif /* PAN_ARCH != 9 */
 
    cmdbuf->cur_batch = NULL;
 }
@@ -301,6 +296,10 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
       cfg.fb_height = fb->height_px;
       cfg.heap = batch->tiler.heap_desc.gpu;
       cfg.sample_pattern = pan_sample_pattern(fb->sample_count);
+#if PAN_ARCH >= 9
+      cfg.first_provoking_vertex =
+         cmdbuf->state.gfx.render.first_provoking_vertex != U_TRISTATE_NO;
+#endif
    }
 
    memcpy(batch->tiler.heap_desc.cpu, &batch->tiler.heap_templ,
