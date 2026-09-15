@@ -1,0 +1,20 @@
+VK_IMG_filter_linear_2d on pvr
+VK_KHR_maintenance7 on pvr
+Vulkan 1.3 on panvk/v6-7
+VK_KHR_maintenance4 on panvk/v6-7
+VK_KHR_maintenance5 on panvk/v6-7
+VK_KHR_maintenance7 on panvk/v6-7
+VK_KHR_maintenance8 on panvk/v6-7
+VK_KHR_shader_float_controls2 on panvk/v6-7
+VK_KHR_shader_subgroup_extended_types on panvk/v6-7
+VK_EXT_subgroup_size_control on panvk/v6-7
+VK_ARM_shader_core_builtins on panvk/v6-7
+VK_ARM_shader_core_properties on panvk/v6-7
+VK_ARM_scheduling_controls on panvk/v6-7
+shaderCoreBuiltins on panvk/v6-7
+schedulingControls on panvk/v6-7
+VK_KHR_synchronization2 on pvr
+VK_KHR_copy_memory_indirect on panvk
+VK_KHR_maintenance6 on panvk/v6-7
+VK_KHR_spirv_1_4 on panvk/v6-7
+VK_EXT_device_memory_report on v3dv

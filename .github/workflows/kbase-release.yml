@@ -1,0 +1,439 @@
+---
+name: PanVK kbase release packages
+
+'on':
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag to create or update
+        required: false
+        type: string
+  push:
+    tags:
+      - 'kbase-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-packages:
+    name: Build ${{ matrix.label }} package
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: debian13
+            label: Debian 13
+            image: debian:13
+            family: deb
+            libdir: lib/aarch64-linux-gnu
+          - target: ubuntu2604
+            label: Ubuntu 26.04
+            image: ubuntu:26.04
+            family: deb
+            libdir: lib/aarch64-linux-gnu
+          - target: archlinux
+            label: Arch Linux
+            image: menci/archlinuxarm:base-devel
+            family: arch
+            libdir: lib
+          - target: generic
+            label: generic tar.gz
+            image: debian:13
+            family: tar
+            libdir: lib
+    container:
+      image: ${{ matrix.image }}
+    env:
+      BUILD_DIR: build-release-${{ matrix.target }}
+      PACKAGE_NAME: mesa-panvk-kbase
+      # Do not call this TARGET: bindgen treats TARGET as a Rust/Clang target
+      # triple, while our values are package labels such as "debian13".
+      PACKAGE_TARGET: ${{ matrix.target }}
+      LIBDIR: ${{ matrix.libdir }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Debian-family build dependencies
+        if: matrix.family == 'deb' || matrix.family == 'tar'
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends \
+            bison \
+            build-essential \
+            bindgen \
+            ca-certificates \
+            cargo \
+            cmake \
+            dpkg-dev \
+            flex \
+            glslang-tools \
+            libclang-cpp-dev \
+            libclang-dev \
+            libdrm-dev \
+            libelf-dev \
+            libexpat1-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxrandr-dev \
+            libxcb-dri3-dev \
+            libxcb-present-dev \
+            libxcb-randr0-dev \
+            libxcb-shm0-dev \
+            libxcb-sync-dev \
+            libxcb-xfixes0-dev \
+            libxshmfence-dev \
+            libxxf86vm-dev \
+            llvm-dev \
+            ninja-build \
+            pkgconf \
+            python3 \
+            python3-mako \
+            python3-packaging \
+            python3-pip \
+            python3-setuptools \
+            python3-yaml \
+            rustc \
+            spirv-tools \
+            zlib1g-dev
+          LLVM_MAJOR="$(llvm-config --version | cut -d. -f1)"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends \
+            "libclc-${LLVM_MAJOR}-dev" \
+            "libllvmspirvlib-${LLVM_MAJOR}-dev"
+          if [[ "${PACKAGE_TARGET}" == ubuntu2604 ]]; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              --no-install-recommends spirv-tools-dev
+          fi
+          python3 -m pip install --break-system-packages \
+            'meson>=1.4.0,<2'
+
+      - name: Install Arch Linux build dependencies
+        if: matrix.family == 'arch'
+        shell: bash
+        run: |
+          pacman --disable-sandbox -Syu --noconfirm --needed \
+            base-devel \
+            bison \
+            clang \
+            cmake \
+            flex \
+            glslang \
+            libclc \
+            libdrm \
+            libelf \
+            libx11 \
+            libxcb \
+            libxrandr \
+            libxshmfence \
+            llvm \
+            llvm-libs \
+            meson \
+            ninja \
+            pkgconf \
+            python-mako \
+            python-packaging \
+            python-ply \
+            python-pyyaml \
+            rust \
+            spirv-llvm-translator \
+            spirv-tools \
+            vulkan-icd-loader \
+            zlib \
+            zstd
+          # Pin bindgen for Arch's rapidly moving Rust/Clang toolchain and
+          # expose Cargo's bin directory to subsequent workflow steps.
+          # 0.71.1 mis-generates one-byte C structures here; Mesa rejects
+          # 0.72.0, while 0.72.1 contains the relevant fixes.
+          cargo install --locked --version 0.72.1 bindgen-cli
+          echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
+
+      - name: Configure minimal release build
+        shell: bash
+        run: |
+          meson setup "${BUILD_DIR}" \
+            --buildtype=release \
+            --prefix=/usr \
+            --libdir="${LIBDIR}" \
+            -Db_ndebug=true \
+            -Dbuild-tests=false \
+            -Ddisplay-info=disabled \
+            -Degl=disabled \
+            -Denable-glcpp-tests=false \
+            -Dgallium-drivers= \
+            -Dgbm=disabled \
+            -Dgles1=disabled \
+            -Dgles2=disabled \
+            -Dglx=disabled \
+            -Dinstall-mesa-clc=false \
+            -Dinstall-precomp-compiler=false \
+            -Dlibunwind=disabled \
+            -Dlmsensors=disabled \
+            -Dllvm=enabled \
+            -Dmesa-clc=enabled \
+            -Dopengl=false \
+            -Dpanfrost-kmds=kbase,panthor \
+            -Dpanfrost-rust=true \
+            -Dplatforms=x11 \
+            -Dprecomp-compiler=enabled \
+            -Dshared-glapi=disabled \
+            -Dtools= \
+            -Dvalgrind=disabled \
+            -Dvideo-codecs= \
+            -Dvulkan-drivers=panfrost \
+            -Dvulkan-layers= \
+            -Dxmlconfig=disabled \
+            -Dzstd=disabled
+
+      - name: Build with all available cores
+        run: meson compile -C "${BUILD_DIR}" -j "$(nproc)"
+
+      - name: Stage runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MESA_VERSION="$(tr -d '[:space:]' < VERSION)"
+          DEB_VERSION="${MESA_VERSION/-devel/~devel}+git${GITHUB_SHA:0:12}-1"
+          ARCH_VERSION="${MESA_VERSION//-/_}.git${GITHUB_SHA:0:12}"
+          ASSET_VERSION="${MESA_VERSION}-git${GITHUB_SHA:0:12}"
+          RUNTIME_ROOT="${GITHUB_WORKSPACE}/runtime-${PACKAGE_TARGET}"
+          RUNTIME_LIBDIR="${RUNTIME_ROOT}/usr/${LIBDIR}"
+          ICDDIR="${RUNTIME_ROOT}/usr/share/vulkan/icd.d"
+          DOCDIR="${RUNTIME_ROOT}/usr/share/doc/${PACKAGE_NAME}"
+
+          mkdir -p "${RUNTIME_LIBDIR}" "${ICDDIR}" "${DOCDIR}"
+          install -m755 \
+            "${BUILD_DIR}/src/panfrost/vulkan/libvulkan_panfrost.so" \
+            "${RUNTIME_LIBDIR}/libvulkan_panfrost_kbase.so"
+          strip --strip-unneeded \
+            "${RUNTIME_LIBDIR}/libvulkan_panfrost_kbase.so"
+          install -m644 docs/panvk-kbase.md "${DOCDIR}/README.md"
+
+          python3 - \
+            "${BUILD_DIR}/src/panfrost/vulkan/panfrost_icd.aarch64.json" \
+            "${ICDDIR}/panfrost_kbase_icd.aarch64.json" \
+            "/usr/${LIBDIR}/libvulkan_panfrost_kbase.so" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              manifest = json.load(source)
+          manifest["ICD"]["library_path"] = sys.argv[3]
+          with open(sys.argv[2], "w", encoding="utf-8") as output:
+              json.dump(manifest, output, indent=4)
+              output.write("\n")
+          PY
+
+          {
+            echo "MESA_VERSION=${MESA_VERSION}"
+            echo "DEB_VERSION=${DEB_VERSION}"
+            echo "ARCH_VERSION=${ARCH_VERSION}"
+            echo "ASSET_VERSION=${ASSET_VERSION}"
+            echo "RUNTIME_ROOT=${RUNTIME_ROOT}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build Debian or Ubuntu package
+        if: matrix.family == 'deb'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACKAGE_ROOT="${RUNTIME_ROOT}"
+          PACKAGE_FILE="${PACKAGE_NAME}-${PACKAGE_TARGET}_${DEB_VERSION}_arm64.deb"
+          LIBRARY="${PACKAGE_ROOT}/usr/${LIBDIR}/libvulkan_panfrost_kbase.so"
+
+          mkdir -p "${PACKAGE_ROOT}/DEBIAN" debian
+          cat > debian/control <<'EOF'
+          Source: mesa-panvk-kbase
+          Section: libs
+          Priority: optional
+          Maintainer: funnymdzz <funnymdzz@gmail.com>
+          Standards-Version: 4.7.0
+
+          Package: mesa-panvk-kbase
+          Architecture: arm64
+          Description: Mesa PanVK Vulkan ICD for proprietary Mali kbase CSF
+          EOF
+
+          SHLIB_DEPS="$(dpkg-shlibdeps -O -e"${LIBRARY}" | \
+            sed -n 's/^shlibs:Depends=//p')"
+          cat > "${PACKAGE_ROOT}/DEBIAN/control" <<EOF
+          Package: ${PACKAGE_NAME}
+          Version: ${DEB_VERSION}
+          Section: libs
+          Priority: optional
+          Architecture: arm64
+          Maintainer: funnymdzz <funnymdzz@gmail.com>
+          Depends: ${SHLIB_DEPS}, libvulkan1
+          Provides: vulkan-icd
+          Description: Mesa PanVK Vulkan ICD for proprietary Mali kbase CSF
+           Experimental arm64 Vulkan driver for Linux environments using the
+           proprietary Arm Mali kbase CSF kernel driver.
+          EOF
+
+          dpkg-deb --root-owner-group --build \
+            "${PACKAGE_ROOT}" "${PACKAGE_FILE}"
+          dpkg-deb --info "${PACKAGE_FILE}"
+          dpkg-deb --contents "${PACKAGE_FILE}"
+          echo "PACKAGE_FILE=${PACKAGE_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Build Arch Linux package
+        if: matrix.family == 'arch'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACKAGE_DIR="${GITHUB_WORKSPACE}/arch-package"
+          mkdir -p "${PACKAGE_DIR}/payload"
+          cp -a "${RUNTIME_ROOT}/usr" "${PACKAGE_DIR}/payload/"
+          cat > "${PACKAGE_DIR}/PKGBUILD" <<EOF
+          pkgname=${PACKAGE_NAME}
+          pkgver=${ARCH_VERSION}
+          pkgrel=1
+          pkgdesc='Mesa PanVK Vulkan ICD for proprietary Mali kbase CSF'
+          arch=('aarch64')
+          url='https://github.com/funnymdzz/mesa'
+          license=('MIT')
+          depends=('glibc' 'gcc-libs' 'libdrm' 'libelf' 'libx11' 'libxcb' 'libxshmfence' 'llvm-libs' 'vulkan-icd-loader' 'zlib')
+          options=('!debug')
+          source=()
+          sha256sums=()
+
+          package() {
+            cp -a "\${startdir}/payload/usr" "\${pkgdir}/"
+          }
+          EOF
+
+          useradd --create-home builder
+          chown -R builder:builder "${PACKAGE_DIR}"
+          sed -i "s/^PKGEXT=.*/PKGEXT='.pkg.tar.zst'/" /etc/makepkg.conf
+          runuser -u builder -- bash -c \
+            'cd "$1" && makepkg --noconfirm --force' _ "${PACKAGE_DIR}"
+          BUILT_PACKAGE="$(runuser -u builder -- bash -c \
+            'cd "$1" && makepkg --packagelist' _ "${PACKAGE_DIR}")"
+          PACKAGE_FILE="$(basename "${BUILT_PACKAGE}")"
+          cp "${BUILT_PACKAGE}" "${GITHUB_WORKSPACE}/${PACKAGE_FILE}"
+          echo "PACKAGE_FILE=${PACKAGE_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Build generic tarball
+        if: matrix.family == 'tar'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUNDLE_NAME="${PACKAGE_NAME}-${ASSET_VERSION}-aarch64"
+          BUNDLE_ROOT="${GITHUB_WORKSPACE}/${BUNDLE_NAME}"
+          mkdir -p "${BUNDLE_ROOT}/lib" \
+            "${BUNDLE_ROOT}/share/vulkan/icd.d"
+          cp "${RUNTIME_ROOT}/usr/lib/libvulkan_panfrost_kbase.so" \
+            "${BUNDLE_ROOT}/lib/"
+          cp "${RUNTIME_ROOT}/usr/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json" \
+            "${BUNDLE_ROOT}/share/vulkan/icd.d/"
+          cp docs/panvk-kbase.md "${BUNDLE_ROOT}/README.md"
+
+          python3 - \
+            "${BUNDLE_ROOT}/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              manifest = json.load(source)
+          manifest["ICD"]["library_path"] = "libvulkan_panfrost_kbase.so"
+          with open(sys.argv[1], "w", encoding="utf-8") as output:
+              json.dump(manifest, output, indent=4)
+              output.write("\n")
+          PY
+
+          cat > "${BUNDLE_ROOT}/env.sh" <<'EOF'
+          # Source this file from Bash: . ./env.sh
+          PANVK_KBASE_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+          export LD_LIBRARY_PATH="${PANVK_KBASE_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+          export VK_DRIVER_FILES="${PANVK_KBASE_ROOT}/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json"
+          EOF
+          chmod 755 "${BUNDLE_ROOT}/env.sh"
+
+          PACKAGE_FILE="${BUNDLE_NAME}.tar.gz"
+          tar -C "${GITHUB_WORKSPACE}" -czf "${PACKAGE_FILE}" "${BUNDLE_NAME}"
+          echo "PACKAGE_FILE=${PACKAGE_FILE}" >> "${GITHUB_ENV}"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesa-panvk-kbase-${{ matrix.target }}-aarch64
+          path: ${{ github.workspace }}/${{ env.PACKAGE_FILE }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Meson logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesa-panvk-kbase-${{ matrix.target }}-logs
+          path: ${{ github.workspace }}/${{ env.BUILD_DIR }}/meson-logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-packages
+    if: >-
+      startsWith(github.ref, 'refs/tags/kbase-v') ||
+      inputs.release_tag != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mesa-panvk-kbase-*-aarch64
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | \
+            xargs -0 sha256sum > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create or update release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/kbase-v* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+          else
+            RELEASE_TAG="${REQUESTED_TAG}"
+          fi
+          RELEASE_VERSION="${RELEASE_TAG#kbase-}"
+
+          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if gh release view "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "PanVK kbase ${RELEASE_VERSION}" \
+              --notes-file .github/panvk-kbase-release-notes.md
+            gh release upload "${RELEASE_TAG}" "${ASSETS[@]}" \
+              --repo "${GITHUB_REPOSITORY}" --clobber
+          else
+            gh release create "${RELEASE_TAG}" "${ASSETS[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${GITHUB_SHA}" \
+              --title "PanVK kbase ${RELEASE_VERSION}" \
+              --notes-file .github/panvk-kbase-release-notes.md
+          fi

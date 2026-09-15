@@ -1,0 +1,7 @@
+{
+    "file_format_version": "1.0.0",
+    "ICD": {
+        "library_path": "/data/data/com.termux/files/home/mesa/build-x11/src/panfrost/vulkan/libvulkan_panfrost.so",
+        "api_version": "1.4.305"
+    }
+}

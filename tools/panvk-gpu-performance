@@ -1,0 +1,72 @@
+#!/bin/sh
+
+set -eu
+
+gpu_sysfs="${PANVK_GPU_SYSFS:-/sys/class/misc/mali0/device}"
+
+fail()
+{
+   echo "panvk-gpu-performance: $*" >&2
+   exit 1
+}
+
+[ -d "$gpu_sysfs" ] || fail "Mali sysfs directory not found: $gpu_sysfs"
+[ -r "$gpu_sysfs/available_frequencies" ] ||
+   fail "available_frequencies is not exposed by this kbase driver"
+
+frequencies=$(cat "$gpu_sysfs/available_frequencies")
+max_freq=$(printf '%s\n' "$frequencies" | awk '{ print $1 }')
+min_freq=$(printf '%s\n' "$frequencies" | awk '{ print $NF }')
+
+set_full_range()
+{
+   echo "$min_freq" > "$gpu_sysfs/scaling_min_freq"
+   echo "$max_freq" > "$gpu_sysfs/scaling_max_freq"
+}
+
+set_governor()
+{
+   governor=$1
+   available=$(cat "$gpu_sysfs/available_governors")
+
+   case " $available " in
+   *" $governor "*) echo "$governor" > "$gpu_sysfs/governor" ;;
+   *) return 1 ;;
+   esac
+}
+
+show_status()
+{
+   echo "governor=$(cat "$gpu_sysfs/governor")"
+   echo "frequency_range=$(cat "$gpu_sysfs/scaling_min_freq")-$(cat "$gpu_sysfs/scaling_max_freq") kHz"
+   echo "current_frequency=$(cat "$gpu_sysfs/cur_freq") kHz"
+   sed -n '1,25p' "$gpu_sysfs/clock_info"
+}
+
+case "${1:-auto}" in
+auto)
+   set_full_range
+   if ! set_governor quickstep_use_mcu; then
+      set_governor capacity_use_mcu ||
+         fail "no MCU-based governor is available"
+   fi
+   ;;
+default)
+   set_full_range
+   set_governor quickstep || fail "quickstep governor is not available"
+   ;;
+max)
+   echo "$max_freq" > "$gpu_sysfs/scaling_max_freq"
+   echo "$max_freq" > "$gpu_sysfs/scaling_min_freq"
+   ;;
+status)
+   show_status
+   exit 0
+   ;;
+*)
+   echo "Usage: ${0##*/} [auto|default|max|status]" >&2
+   exit 2
+   ;;
+esac
+
+show_status

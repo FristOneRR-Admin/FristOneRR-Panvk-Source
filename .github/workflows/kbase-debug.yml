@@ -1,0 +1,122 @@
+---
+name: PanVK kbase debug Mesa
+
+'on':
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-kbase-debug:
+    name: Build PanVK kbase debug Mesa
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:13
+    env:
+      ARTIFACT_NAME: mesa-panvk-kbase-debug-aarch64
+      BUILD_DIR: build
+      INSTALL_PREFIX: /opt/mesa
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends \
+            bison \
+            build-essential \
+            ca-certificates \
+            flex \
+            libdrm-dev \
+            libelf-dev \
+            libexpat1-dev \
+            libclang-cpp-dev \
+            libclang-dev \
+            libwayland-dev \
+            libwayland-egl-backend-dev \
+            ninja-build \
+            pkgconf \
+            python3 \
+            python3-mako \
+            python3-packaging \
+            python3-pip \
+            python3-setuptools \
+            python3-yaml \
+            llvm-dev \
+            glslang-tools \
+            spirv-tools \
+            wayland-protocols \
+            zlib1g-dev \
+            zip
+          LLVM_MAJOR="$(llvm-config --version | cut -d. -f1)"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends \
+            "libclc-${LLVM_MAJOR}-dev" \
+            "libllvmspirvlib-${LLVM_MAJOR}-dev"
+
+      - name: Install Meson
+        run: |
+          python3 -m pip install --break-system-packages \
+            'meson>=1.4.0,<2'
+
+      - name: Configure
+        run: |
+          meson setup "${BUILD_DIR}" \
+            --buildtype=debug \
+            -Dprefix="${INSTALL_PREFIX}" \
+            -Dlibdir=lib \
+            -Dbuild-tests=false \
+            -Degl=enabled \
+            -Degl-native-platform=auto \
+            -Denable-glcpp-tests=false \
+            -Dgallium-drivers=panfrost \
+            -Dgbm=enabled \
+            -Dgles1=disabled \
+            -Dgles2=enabled \
+            -Dglx=disabled \
+            -Dllvm=enabled \
+            -Dopengl=false \
+            -Dpanfrost-kmds=kbase,panthor \
+            -Dplatforms=wayland \
+            -Dvalgrind=disabled \
+            -Dvulkan-drivers=panfrost \
+            -Dzstd=disabled
+
+      - name: Build
+        run: meson compile -C "${BUILD_DIR}" -j "$(nproc)"
+
+      - name: Install
+        run: |
+          rm -rf artifacts
+          mkdir -p artifacts/install-root
+          meson install -C "${BUILD_DIR}" \
+            --destdir "${GITHUB_WORKSPACE}/artifacts/install-root"
+
+      - name: Create zip package
+        run: |
+          cd "${GITHUB_WORKSPACE}/artifacts/install-root"
+          zip -r \
+            "${GITHUB_WORKSPACE}/${ARTIFACT_NAME}.zip" \
+            opt/mesa
+
+      - name: Upload Mesa package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ github.workspace }}/${{ env.ARTIFACT_NAME }}.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Meson logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-logs
+          path: ${{ github.workspace }}/build/meson-logs
+          if-no-files-found: ignore
+          retention-days: 7

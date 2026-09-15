@@ -1,0 +1,228 @@
+Job Header (5ff7fd5080):
+  Exception Status: 0x1
+  First Incomplete Task: 0x0
+  Fault Pointer: 0x0
+  Type: Compute
+  Barrier: false
+  Suppress Prefetch: false
+  Relax Dependency 1: false
+  Relax Dependency 2: false
+  Index: 1
+  Dependency 1: 0
+  Dependency 2: 0
+  Next: 0x0
+
+Shader Shader @5ff7ff6000:
+  Type: Shader
+  Stage: Compute
+  Fragment coverage bitmask type: DX
+  Vertex warp limit: Full
+  Suppress NaN: false
+  Flush to zero mode: Preserve subnormals
+  Suppress Inf: false
+  Requires helper threads: false
+  Shader contains JUMP_EX: false
+  Register allocation: 32 Per Thread
+  Preload:
+    R48-R63: 0x0
+    R55: false
+    R56: false
+    R57: false
+    R58: false
+    R59: false
+    R60: false
+    R61: false
+    R62: false
+    R63: false
+  Binary: 0x5fef000000
+
+Shader 0x5fef000000 (GPU VA 5fef000000) sz 16384
+c0 c4 00 00 04 80 6b 00    LEA_PKA.slot0 @r0:r1, 0x0, 0x1000000
+c0 2a 00 00 00 c2 10 09    IADD_IMM.i32.wait0 r2, 0x0, #0x2A
+40 00 00 58 02 42 61 78    STORE.i32.slot1.end @r2, [r0^:r1^], offset:0
+
+
+
+Resources resource table @5ff7fd5040
+    Entry 0 @5ff7fd5040:
+      Address: 0x5ff7fd5020
+      Contains descriptors: true
+      Size: 0x20
+        Sampler @5ff7fd5020:
+          Type: Sampler
+          Wrap Mode R: Clamp to Edge
+          Wrap Mode T: Clamp to Edge
+          Wrap Mode S: Clamp to Edge
+          Round to nearest even: true
+          sRGB override: false
+          Seamless Cube Map: true
+          Clamp integer coordinates: false
+          Normalized Coordinates: true
+          Clamp integer array indices: false
+          Minify nearest: false
+          Magnify nearest: false
+          Magnify cutoff: false
+          Mipmap Mode: Nearest
+          Minimum LOD: 0.000000
+          Compare Function: Never
+          Maximum LOD: 0.000000
+          LOD bias: 0.000000
+          Maximum anisotropy: 1
+          LOD algorithm: Isotropic
+          Border Color R: 0x0 (0.000000)
+          Border Color G: 0x0 (0.000000)
+          Border Color B: 0x0 (0.000000)
+          Border Color A: 0x0 (0.000000)
+    Entry 1 @5ff7fd5050:
+      Address: 0x0
+      Contains descriptors: false
+      Size: 0x0
+    Entry 2 @5ff7fd5060:
+      Address: 0x0
+      Contains descriptors: false
+      Size: 0x0
+    Entry 3 @5ff7fd5070:
+      Address: 0x0
+      Contains descriptors: false
+      Size: 0x0
+Local Storage:
+  TLS Size: 0
+  WLS Instances: 2147483648
+  WLS Size Base: 0
+  WLS Size Scale: 0
+  TLS Base Pointer: 0x0
+  TLS Address Mode: Flat
+  WLS Base Pointer: 0x0
+Compute  Workgroup size X: 1
+  Workgroup size Y: 1
+  Workgroup size Z: 1
+  Allow merging workgroups: false
+  Task increment: 1
+  Task axis: X
+  Workgroup count X: 0x1
+  Workgroup count Y: 0x1
+  Workgroup count Z: 0x1
+  Offset X: 0x0
+  Offset Y: 0x0
+  Offset Z: 0x0
+  Compute:
+    Attribute offset: 0x0
+    FAU count: 0
+    Resources: 0x5ff7fd5044
+    Shader: 0x5ff7ff6000
+    Thread storage: 0x5ff7fd5000
+    FAU: 0x0
+Buffer: memory_5ff7fff000 gpu 5ff7fff000
+
+000000  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000080  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000090  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000100  40 00 40 00 C0 00 40 00 40 00 C0 00 C0 00 C0 00 
+000110  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000180  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000190  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000200  60 00 20 00 E0 00 60 00 20 00 A0 00 A0 00 E0 00 
+000210  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000280  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000290  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000300  90 00 50 00 70 00 B0 00 D0 00 90 00 50 00 30 00 
+000310  30 00 D0 00 10 00 70 00 B0 00 F0 00 F0 00 10 00 
+000320  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000380  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000390  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000400  90 00 90 00 70 00 50 00 50 00 A0 00 C0 00 70 00 
+000410  30 00 60 00 A0 00 D0 00 D0 00 B0 00 B0 00 30 00 
+000420  60 00 E0 00 80 00 10 00 40 00 20 00 20 00 C0 00 
+000430  00 00 80 00 F0 00 40 00 E0 00 F0 00 10 00 00 00 
+000440  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000480  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000490  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000500  C0 00 C0 00 40 00 40 00 00 00 00 00 00 00 00 00 
+000510  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000580  80 00 80 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000590  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7ffb000 gpu 5ff7ffb000
+
+000000  08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+003FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7ffa000 gpu 5ff7ffa000
+
+000000  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7ff6000 gpu 5ff7ff6000
+
+000000  18 00 00 80 00 00 00 00 00 00 00 EF 5F 00 00 00 
+000010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+003FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7ff5000 gpu 5ff7ff5000
+
+000000  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000FE0  19 00 00 00 04 00 00 00 00 A0 FF F7 5F 00 00 00 
+000FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7fe5000 gpu 5ff7fe5000
+
+000000  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+00FFF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5ff7fd5000 gpu 5ff7fd5000
+
+000000  00 00 00 00 1F 00 00 00 00 00 00 00 00 00 00 00 
+000010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000020  01 99 A9 02 00 00 00 00 00 00 00 00 00 00 00 00 
+000030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000040  20 50 FD F7 5F 00 00 01 20 00 00 00 00 00 00 00 
+000050  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+000080  01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+000090  08 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 
+0000A0  00 00 00 00 01 00 00 00 01 00 00 00 01 00 00 00 
+0000B0  01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+0000C0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+0000E0  44 50 FD F7 5F 00 00 00 00 60 FF F7 5F 00 00 00 
+0000F0  00 50 FD F7 5F 00 00 00 00 00 00 00 00 00 00 00 
+000100  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+00FFF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+
+Buffer: memory_5fef000000 gpu 5fef000000
+
+000000  C0 C4 00 00 04 80 6B 00 C0 2A 00 00 00 C2 10 09 
+000010  40 00 00 58 02 42 61 78 00 00 00 00 00 00 00 00 
+000020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+*
+003FF0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+

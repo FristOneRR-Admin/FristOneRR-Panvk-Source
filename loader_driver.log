@@ -1,0 +1,31 @@
+[Vulkan Loader] LAYER:          Searching for implicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/home/.config/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/etc/xdg/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/etc/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/home/.local/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/share/vulkan/implicit_layer.d
+[Vulkan Loader] LAYER:             Found no files
+[Vulkan Loader] LAYER:          Searching for explicit layer manifest files
+[Vulkan Loader] LAYER:             In following locations:
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/home/.config/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/etc/xdg/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/etc/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/home/.local/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:                /data/data/com.termux/files/usr/share/vulkan/explicit_layer.d
+[Vulkan Loader] LAYER:             Found no files
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /data/data/com.termux/files/home/mesa/build/src/panfrost/vulkan/panfrost_devenv_icd.aarch64.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /data/data/com.termux/files/home/mesa/build/src/panfrost/vulkan/panfrost_devenv_icd.aarch64.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /data/data/com.termux/files/home/mesa/build/src/panfrost/vulkan/panfrost_devenv_icd.aarch64.json, version 1.0.1
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named /data/data/com.termux/files/home/mesa/build/src/panfrost/vulkan/libvulkan_panfrost.so
+[Vulkan Loader] LAYER:          vkCreateInstance layer callstack setup to:
+[Vulkan Loader] LAYER:             <Application>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Loader>
+[Vulkan Loader] LAYER:               ||
+[Vulkan Loader] LAYER:             <Drivers>
+create=0
+enumerate=-3 count=0

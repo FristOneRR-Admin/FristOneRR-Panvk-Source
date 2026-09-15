@@ -1,0 +1,74 @@
+---
+name: Build deqp-vk (aarch64)
+
+'on':
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/deqp-vk-aarch64.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-deqp-vk:
+    name: Build deqp-vk for aarch64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            git \
+            libegl-dev \
+            libgles-dev \
+            ninja-build \
+            pkgconf \
+            python3 \
+            zip
+
+      - name: Checkout VK-GL-CTS
+        run: |
+          git clone --depth 1 \
+            https://github.com/KhronosGroup/VK-GL-CTS.git vk-gl-cts
+
+      - name: Fetch external sources
+        working-directory: vk-gl-cts
+        run: python3 external/fetch_sources.py
+
+      - name: Configure
+        working-directory: vk-gl-cts
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDEQP_TARGET=surfaceless \
+            -DSELECTED_BUILD_TARGETS=deqp-vk
+
+      - name: Build deqp-vk
+        working-directory: vk-gl-cts
+        run: ninja -C build deqp-vk
+
+      - name: Package
+        working-directory: vk-gl-cts
+        run: |
+          strip build/external/vulkancts/modules/vulkan/deqp-vk
+          mkdir -p pkg
+          cp -r build/external/vulkancts/modules/vulkan pkg/deqp-vk-dist
+          # Trim intermediate build objects, keep the binary and data files.
+          find pkg/deqp-vk-dist -name '*.o' -delete
+          find pkg/deqp-vk-dist -name '*.a' -delete
+          rm -rf pkg/deqp-vk-dist/CMakeFiles
+          cd pkg && zip -r ../deqp-vk-aarch64.zip deqp-vk-dist
+
+      - name: Upload deqp-vk package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deqp-vk-aarch64
+          path: vk-gl-cts/deqp-vk-aarch64.zip
+          if-no-files-found: error
+          retention-days: 30
