@@ -122,12 +122,10 @@ int main(void)
     si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     si.commandBufferCount = 1;
     si.pCommandBuffers = &cmd;
-    fputs("BEFORE vkQueueSubmit
-", stdout);
+    fputs("BEFORE vkQueueSubmit\n", stdout);
     fflush(stdout);
     if (!check(vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE), "vkQueueSubmit failed")) return 1;
-    fputs("vkQueueSubmit: OK
-", stdout);
+    fputs("vkQueueSubmit: OK\n", stdout);
     vkDeviceWaitIdle(device);
     vkFreeCommandBuffers(device, pool, 1, &cmd);
     vkDestroyCommandPool(device, pool, 0);
