@@ -675,7 +675,8 @@ GENX(pandecode_abort_on_fault)(struct pandecode_context *ctx,
 
       /* Ensure the job is marked COMPLETE */
       if (h.exception_status != 0x1) {
-         fprintf(stderr, "Incomplete job or timeout\n");
+         fprintf(stderr, "Incomplete job or timeout: exception_status=0x%llx job_type=%u fault_addr=0x%llx\n",
+                 (unsigned long long)h.exception_status, h.type, (unsigned long long)h.fault_pointer);
          fflush(NULL);
          abort();
       }

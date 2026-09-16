@@ -2056,7 +2056,7 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
    for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
       if (kd->atoms[i].atom_number == ev->atom_number) {
          kd->atoms[i].completed = true;
-         kd->atoms[i].errored = !!(ev->event_code & BASE_JD_EVENT_ERR_MASK);
+         kd->atoms[i].errored = (ev->event_code != BASE_JD_EVENT_DONE);
          return;
       }
    }
