@@ -2325,12 +2325,24 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          return;
    }
 
+   /*
+    * blend_emit_descs() updates fs.blend_descs[], which are copied into
+    * fragment push uniforms by cmd_prepare_draw_sysvals().  Prepare blend
+    * descriptors before serializing push uniforms.
+    */
+   uint64_t blend_gpu = 0, zsd_gpu = 0;
+   result = v9_prepare_blend_zsd(cmdbuf, fs, &blend_gpu, &zsd_gpu);
+   if (result != VK_SUCCESS)
+      return;
+
    panvk_per_arch(cmd_prepare_draw_sysvals)(cmdbuf, info, fs);
+
    struct pan_ptr vs_push;
    result = panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, vs, &vs_push, 1);
    if (result != VK_SUCCESS)
       return;
    cmdbuf->state.gfx.vs.push_uniforms = vs_push.gpu;
+
    if (fs) {
       struct pan_ptr fs_push;
       result = panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, fs, &fs_push, 1);
@@ -2338,11 +2350,6 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          return;
       cmdbuf->state.gfx.fs.push_uniforms = fs_push.gpu;
    }
-
-   uint64_t blend_gpu = 0, zsd_gpu = 0;
-   result = v9_prepare_blend_zsd(cmdbuf, fs, &blend_gpu, &zsd_gpu);
-   if (result != VK_SUCCESS)
-      return;
    fprintf(stderr,
            "[V9-DRAW] emit malloc vertex job blend=0x%llx zsd=0x%llx",
            (unsigned long long)blend_gpu,

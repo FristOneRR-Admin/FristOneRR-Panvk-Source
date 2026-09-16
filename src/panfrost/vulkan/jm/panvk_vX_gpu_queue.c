@@ -129,6 +129,9 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
          pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
       }
 
+      fprintf(stderr, "[PANDECODE-CHECK] frag reached, decode_ctx=%p debug=0x%llx first_job=0x%llx\n",
+              (void*)dev->debug.decode_ctx, (unsigned long long)panvk_debug,
+              (unsigned long long)batch->frag_jc.first_job);
       if (PANVK_DEBUG(TRACE))
          pandecode_jc(dev->debug.decode_ctx, batch->frag_jc.first_job,
                       phys_dev->kmod.dev->props.gpu_id);

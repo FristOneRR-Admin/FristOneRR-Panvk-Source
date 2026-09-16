@@ -44,6 +44,10 @@ panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
    if (!job_ptr.gpu)
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
+   fprintf(stderr, "[FRAGJOB-CHECK] tiling_area min=(%d,%d) max=(%d,%d) w=%u h=%u fbd=0x%llx\n",
+           fb->tiling_area_px.min_x, fb->tiling_area_px.min_y,
+           fb->tiling_area_px.max_x, fb->tiling_area_px.max_y,
+           fb->width_px, fb->height_px, (unsigned long long)fbd);
    pan_section_pack(job_ptr.cpu, FRAGMENT_JOB, PAYLOAD, payload) {
       assert(pan_fb_bbox_is_valid(fb->tiling_area_px));
       payload.bound_min_x = fb->tiling_area_px.min_x >> MALI_TILE_SHIFT;
@@ -190,6 +194,14 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
                               : fbd.cpu + pan_size(FRAMEBUFFER),
          };
          tagged_fbd_ptr |= GENX(pan_emit_fb_desc)(&fbd_info, &fb_descs);
+
+         fprintf(stderr, "[FBD-CHECK] fbd.cpu=%p fbd.gpu=0x%llx tagged=0x%llx rts_cpu=%p\n",
+                 fbd.cpu, (unsigned long long)fbd.gpu,
+                 (unsigned long long)tagged_fbd_ptr, fb_descs.rts);
+         fprintf(stderr, "[FBD-CHECK] RT0 raw bytes: ");
+         for (int b = 0; b < 64; b++)
+            fprintf(stderr, "%02x ", ((unsigned char *)fb_descs.rts)[b]);
+         fprintf(stderr, "\n");
 
          result = panvk_cmd_prepare_fragment_job(cmdbuf, tagged_fbd_ptr);
          if (result != VK_SUCCESS)
