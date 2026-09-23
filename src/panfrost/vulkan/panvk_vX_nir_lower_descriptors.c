@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../lib/pan_trace_gate.h"
 #include "panvk_device.h"
 #include "panvk_image.h"
 #include "panvk_sampler.h"
@@ -1043,7 +1044,7 @@ record_binding(struct lower_desc_ctx *ctx, unsigned set, unsigned binding,
 
    assert(desc_stride >= 1 && desc_stride <= max_desc_stride);
    ctx->desc_info.used_set_mask |= BITFIELD_BIT(set);
-   fprintf(stderr, "[DESCDEBUG] record_binding: set=%u binding=%u "
+   PANVK_TRACE_PRINTF( "[DESCDEBUG] record_binding: set=%u binding=%u "
            "type=%u -> used_set_mask now 0x%x\n",
            set, binding, binding_layout->type, ctx->desc_info.used_set_mask);
    fflush(stderr);

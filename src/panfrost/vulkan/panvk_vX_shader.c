@@ -9,6 +9,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../lib/pan_trace_gate.h"
+#include <inttypes.h>
 #include "genxml/gen_macros.h"
 
 #include "panvk_cmd_buffer.h"
@@ -265,6 +267,19 @@ panvk_lower_load_vs_input(nir_builder *b, nir_intrinsic_instr *intrin,
       return false;
 
    const bool no_idvs = *(const bool *)data;
+
+   PANVK_TRACE_PRINTF(
+      "[V9-ATTR-IN] base=0x%08x offset_const=%d offset=0x%" PRIx64 " "
+      "component=%u num_comp=%u bits=%u no_idvs=%d\\n",
+      nir_intrinsic_base(intrin),
+      nir_src_is_const(*nir_get_io_offset_src(intrin)),
+      nir_src_is_const(*nir_get_io_offset_src(intrin)) ?
+         nir_src_as_uint(*nir_get_io_offset_src(intrin)) : 0,
+      nir_intrinsic_component(intrin),
+      intrin->def.num_components,
+      intrin->def.bit_size,
+      no_idvs);
+
    b->cursor = nir_before_instr(&intrin->instr);
    nir_def *ld_attr = nir_load_attribute_pan(
       b, intrin->def.num_components, intrin->def.bit_size,
@@ -1053,8 +1068,7 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
                   struct panvk_shader_desc_info *desc_info,
                   struct panvk_shader_variant *shader)
 {
-   const bool dump_asm =
-      shader_flags & VK_SHADER_CREATE_CAPTURE_INTERNAL_REPRESENTATIONS_BIT_MESA;
+   const bool dump_asm = true; /* FORCED for debugging */
 
    /* We're going to modify this so make our own copy to be nicer to callers */
    struct pan_compile_inputs input = *compile_input;
@@ -1134,6 +1148,7 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
       free(data);
 
       shader->asm_str = asm_str;
+      PANVK_TRACE_PRINTF( "[SHADERASM] ===== stage=%d bin_size=%u =====\n%s\n===== END ASM =====\n", nir->info.stage, shader->bin_size, asm_str ? asm_str : "(null)"); fflush(stderr);
    }
 
    /* Pad the total to the 64-bit-aligned FAU count; it's used to initialize the
@@ -1342,6 +1357,7 @@ panvk_shader_upload(struct panvk_device *dev,
          cfg.flush_to_zero_mode = shader_ftz_mode(shader);
       }
 
+      PANVK_TRACE_PRINTF( "[IDVSDEBUG] stage=%d secondary_enable=%d secondary_offset=%u bin_size=%u\n", shader->info.stage, shader->info.vs.secondary_enable, shader->info.vs.secondary_offset, shader->bin_size); fflush(stderr);
       if (shader->info.vs.secondary_enable) {
          shader->spds.var =
             panvk_pool_alloc_desc(&dev->mempools.rw, SHADER_PROGRAM);

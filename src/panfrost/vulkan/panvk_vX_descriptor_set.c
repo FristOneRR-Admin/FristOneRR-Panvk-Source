@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../lib/pan_trace_gate.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -206,7 +207,7 @@ write_buffer_desc(struct panvk_descriptor_set *set,
    struct mali_buffer_packed desc;
 
    uint64_t dbg_addr = panvk_buffer_gpu_ptr(buffer, info->offset);
-   fprintf(stderr, "[TRACE] write_buffer_desc: is_ssbo=%d addr=0x%lx range=%lu\n", is_ssbo, (unsigned long)dbg_addr, (unsigned long)range); fflush(stderr);
+   PANVK_TRACE_PRINTF( "[TRACE] write_buffer_desc: is_ssbo=%d addr=0x%lx range=%lu\n", is_ssbo, (unsigned long)dbg_addr, (unsigned long)range); fflush(stderr);
    pan_pack(&desc, BUFFER, cfg) {
       cfg.address = dbg_addr;
       cfg.size = align(range, is_ssbo ? 4 : 16);

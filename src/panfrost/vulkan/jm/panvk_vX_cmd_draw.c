@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../../lib/pan_trace_gate.h"
 #include "genxml/gen_macros.h"
 
 #include "panvk_buffer.h"
@@ -2180,6 +2181,19 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
    float z_min, z_max;
    panvk_depth_range(&cmdbuf->state.gfx, &dyns->vp, &z_min, &z_max);
 
+   const bool secondary_shader = vs->info.vs.secondary_enable && fs != NULL;
+   /* Use the real varying count from the linked vs/fs pair instead of a
+    * vkcube-only hardcoded guess. Position is IDVS-side and not counted here,
+    * so vs varying count (fs consumes a subset/same set) drives the stride. */
+   const unsigned vary_slots = MAX2(vs->info.varyings.formats.count, 1);
+   const unsigned vary_stride = secondary_shader ? (vary_slots * 16) : 0;
+   PANVK_TRACE_PRINTF(
+           "[V9-VARY] secondary=%d slots=%u packet=%u attr=%u var_spd=%d\n",
+           (int)secondary_shader, vary_slots,
+           secondary_shader ? vary_stride + 16 : 16, vary_stride,
+           (int)panvk_priv_mem_check_alloc(vs->spds.var));
+   fflush(stderr);
+
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, PRIMITIVE, cfg) {
       cfg.draw_mode = v9_translate_prim(info->prim);
       cfg.allow_rotating_primitives = polygon;
@@ -2187,16 +2201,24 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       cfg.low_depth_cull = cfg.high_depth_cull =
          vk_rasterization_state_depth_clip_enable(rs);
       cfg.index_count = info->vertex.count;
-      cfg.index_type = MALI_INDEX_TYPE_NONE;
       cfg.base_vertex_offset = info->vertex.base;
-      cfg.secondary_shader = false;
+      if (info->index.index_size == 4)
+         cfg.index_type = MALI_INDEX_TYPE_UINT32;
+      else if (info->index.index_size == 2)
+         cfg.index_type = MALI_INDEX_TYPE_UINT16;
+      else if (info->index.index_size == 1)
+         cfg.index_type = MALI_INDEX_TYPE_UINT8;
+      else
+         cfg.index_type = MALI_INDEX_TYPE_NONE;
+      cfg.primitive_restart = info->index.restart_enable;
+      cfg.secondary_shader = secondary_shader;
    }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, INSTANCE_COUNT, cfg) {
       cfg.count = info->instance.count;
    }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, ALLOCATION, cfg) {
-      cfg.vertex_packet_stride = 16;
-      cfg.vertex_attribute_stride = 0;
+      cfg.vertex_packet_stride = secondary_shader ? (vary_stride + 16) : 16;
+      cfg.vertex_attribute_stride = vary_stride;
    }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, TILER, cfg) {
       cfg.address = batch->tiler.ctx.valhall.desc;
@@ -2206,8 +2228,17 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       cfg.fixed_sized = rs->line.width;
    }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, INDICES, cfg) {
-      cfg.address = 0;
+      cfg.address = info->index.buffer_dev_addr
+                    ? (info->index.buffer_dev_addr + info->index.offset)
+                    : 0;
    }
+   PANVK_TRACE_PRINTF(
+           "[V9-IDX] type=%u off=%u addr=0x%llx count=%u base=%d restart=%d\n",
+           info->index.index_size, info->index.offset,
+           (unsigned long long)(info->index.buffer_dev_addr + info->index.offset),
+           info->vertex.count, info->vertex.base,
+           (int)info->index.restart_enable);
+   fflush(stderr);
 
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, DRAW, cfg) {
       cfg.flags_0.cull_front_face = polygon && (rs->cull_mode & VK_CULL_MODE_FRONT_BIT);
@@ -2252,6 +2283,25 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       cfg.fau_count = vs->fau.total_count;
    }
 
+   PANVK_TRACE_PRINTF( "[VARYINGDEBUG] spds.var alloc=%d\n",
+           panvk_priv_mem_check_alloc(vs->spds.var));
+   fflush(stderr);
+   pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, VARYING, cfg) {
+      if (panvk_priv_mem_check_alloc(vs->spds.var)) {
+         cfg.resources = cmdbuf->state.gfx.vs.desc.res_table;
+         cfg.thread_storage = batch->tls.gpu;
+         cfg.shader = panvk_priv_mem_dev_addr(vs->spds.var);
+         cfg.fau = cmdbuf->state.gfx.vs.push_uniforms;
+         cfg.fau_count = vs->fau.total_count;
+      } else {
+         cfg.resources = 0;
+         cfg.thread_storage = 0;
+         cfg.shader = 0;
+         cfg.fau = 0;
+         cfg.fau_count = 0;
+      }
+   }
+
    pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, false, false, 0, 0, &job, false);
    return VK_SUCCESS;
 }
@@ -2259,7 +2309,7 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
 static void
 v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
 {
-   fprintf(stderr,
+   PANVK_TRACE_PRINTF(
            "[V9-DRAW] enter prim=%d vertex_count=%u instance_count=%u first_vertex=%u",
            info->prim, info->vertex.count, info->instance.count,
            info->vertex.base);
@@ -2295,7 +2345,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (result != VK_SUCCESS)
       return;
    result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, 0);
-   fprintf(stderr, "[V9-DRAW] tiler_context result=%d", result);
+   PANVK_TRACE_PRINTF( "[V9-DRAW] tiler_context result=%d", result);
    if (result != VK_SUCCESS)
       return;
 
@@ -2350,7 +2400,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          return;
       cmdbuf->state.gfx.fs.push_uniforms = fs_push.gpu;
    }
-   fprintf(stderr,
+   PANVK_TRACE_PRINTF(
            "[V9-DRAW] emit malloc vertex job blend=0x%llx zsd=0x%llx",
            (unsigned long long)blend_gpu,
            (unsigned long long)zsd_gpu);
@@ -2384,7 +2434,26 @@ panvk_per_arch(CmdDrawIndexed)(VkCommandBuffer commandBuffer,
                                uint32_t firstIndex, int32_t vertexOffset,
                                uint32_t firstInstance)
 {
-   UNREACHABLE("CmdDrawIndexed not yet implemented for arch 9");
+   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
+
+   if (instanceCount == 0 || indexCount == 0)
+      return;
+
+   uint32_t index_size = cmdbuf->state.gfx.ib.index_size;
+   if (index_size == 0 || cmdbuf->state.gfx.ib.size == 0) {
+      PANVK_TRACE_PRINTF( "[V9-IDX] skip: no index buffer bound\n");
+      return;
+   }
+
+   struct panvk_draw_info info = {
+      .index = panvk_draw_info_index(cmdbuf, firstIndex * index_size),
+      .vertex.base = vertexOffset,
+      .vertex.count = indexCount,
+      .instance.base = firstInstance,
+      .instance.count = instanceCount,
+      .prim = panvk_get_client_prim(cmdbuf),
+   };
+   v9_cmd_draw(cmdbuf, &info);
 }
 
 VKAPI_ATTR void VKAPI_CALL

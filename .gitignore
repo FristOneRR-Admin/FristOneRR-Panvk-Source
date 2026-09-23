@@ -16,3 +16,4 @@ test4_draw
 test5a_compute_buffer
 test5b_compute_dispatch
 minimal_graphics_test
+termux-box/

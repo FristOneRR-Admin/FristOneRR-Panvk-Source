@@ -1,3 +1,4 @@
+#include "../lib/pan_trace_gate.h"
 #include <inttypes.h>
 /*
  * Copyright © 2024 Collabora Ltd.
@@ -286,7 +287,7 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
       for (uint32_t i = 0; i < first_unused_set; i++) {
          const struct panvk_descriptor_set *set = desc_state->sets[i];
 
-         fprintf(stderr, "[DESCDEBUG] set-fill: i=%u set_ptr=%p mask_bit=%d "
+         PANVK_TRACE_PRINTF( "[DESCDEBUG] set-fill: i=%u set_ptr=%p mask_bit=%d "
                  "descs.dev=0x%llx desc_count=%u\n",
                  i, (void *)set, !!(desc_info->used_set_mask & BITFIELD_BIT(i)),
                  set ? (unsigned long long)set->descs.dev : 0ull,
@@ -317,7 +318,7 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
    }
 
    shader_desc_state->res_table = ptr.gpu | res_count;
-   fprintf(stderr, "[DESCDEBUG] res_table: used_set_mask=0x%x "
+   PANVK_TRACE_PRINTF( "[DESCDEBUG] res_table: used_set_mask=0x%x "
            "first_unused_set=%u res_count=%u\n",
            desc_info->used_set_mask, first_unused_set, res_count);
    fflush(stderr);

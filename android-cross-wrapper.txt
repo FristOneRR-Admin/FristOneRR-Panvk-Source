@@ -1,0 +1,18 @@
+[binaries]
+c = '/data/data/com.termux/files/home/mesa-toolchain/clang-android35'
+cpp = '/data/data/com.termux/files/home/mesa-toolchain/clang++-android35'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+pkgconfig = 'pkg-config'
+mesa_clc = '/data/data/com.termux/files/home/mesa/build-host/src/util/mesa_clc'
+
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'armv8-a'
+endian = 'little'
+
+[built-in options]
+
+[properties]
+platform-sdk-version = '35'

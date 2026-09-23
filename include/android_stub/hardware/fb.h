@@ -26,6 +26,11 @@
 
 #include <hardware/hardware.h>
 
+#include <cutils/native_handle.h>
+#ifndef buffer_handle_t
+typedef const native_handle_t* buffer_handle_t;
+#endif
+
 __BEGIN_DECLS
 
 #define GRALLOC_HARDWARE_FB0 "fb0"

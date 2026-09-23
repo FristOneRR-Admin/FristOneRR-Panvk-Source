@@ -34,6 +34,8 @@
  *    memory management.
  */
 
+#include "../pan_trace_gate.h"
+#include <time.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/dma-heap.h>
@@ -42,6 +44,8 @@
 #include <sys/ioctl.h>
 #include <poll.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <unistd.h>
 
 #include "util/macros.h"
@@ -177,6 +181,9 @@ struct kbase_kmod_dev {
    simple_mtx_t atoms_lock;
    struct kbase_atom_slot atoms[KBASE_MAX_ATOMS];
    uint64_t next_atom_number;
+   uint32_t last_event_code[256];
+   /* atom_number & 0xff -> last consumed completion of that atom errored */
+   bool atom_failed[256];
 };
 
 struct kbase_kmod_vm {
@@ -331,7 +338,7 @@ kbase_dev_query_props(struct kbase_kmod_dev *kbase_dev,
        * revision (bottom 16 bits). */
       props->gpu_id = ((uint64_t)(raw_gpu_id & 0xffff0000u)) |
                       (uint64_t)(raw_gpu_id & 0xffffu);
-      fprintf(stderr, "[DEBUG] raw_gpu_id=0x%08x  gpu_id=0x%016llx  arch=%u\n",
+      PANVK_TRACE_PRINTF( "[DEBUG] raw_gpu_id=0x%08x  gpu_id=0x%016llx  arch=%u\n",
               raw_gpu_id, (unsigned long long)props->gpu_id,
               (unsigned)(props->gpu_id >> 28));props->gpu_id = ((uint64_t)(raw_gpu_id & 0xffff0000u)) |
                       (uint64_t)(raw_gpu_id & 0xffffu);
@@ -1198,11 +1205,12 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
 
    if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_CSF, &ver) == 0) {
       is_csf = true;
-      fprintf(stderr, "[TRACE] CSF handshake SUCCEEDED, ver=%d.%d\n", ver.major, ver.minor);
+      PANVK_TRACE_PRINTF( "[TRACE] CSF handshake SUCCEEDED, ver=%d.%d\n", ver.major, ver.minor);
       fflush(stderr);
    } else if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_JM, &ver) == 0) {
       is_csf = false;
-      fprintf(stderr, "[TRACE] JM handshake succeeded, ver=%d.%d\n", ver.major, ver.minor);
+      PANVK_TRACE_PRINTF( "[TRACE] JM handshake succeeded, ver=%d.%d\n", ver.major, ver.minor);
+   fprintf(stderr, "PANVK-BUILD: androidfinal-fontatlas10.3 (Mesa 26.3.0-devel)\n");
       fflush(stderr);
 
       if (ver.major < 11) {
@@ -1227,6 +1235,18 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
    if (ioctl(fd, KBASE_IOCTL_SET_FLAGS, &set_flags)) {
       mesa_loge("kbase: KBASE_IOCTL_SET_FLAGS failed: %s", strerror(errno));
       return NULL;
+   }
+
+   /* Empirically, this Mali-G57 kbase JM backend needs ~2s of real
+    * wall-clock time after context creation before the GPU power domain
+    * is ready for job-slot submissions. Submitting before this elapses
+    * reliably TERMINATES the first atom regardless of retry count or
+    * backoff length (both were tested extensively and never helped).
+    * Sleep once here, at context creation, instead of retrying the
+    * first job. */
+   if (!is_csf) {
+      struct timespec warmup_ts = { .tv_sec = 2, .tv_nsec = 0 };
+      nanosleep(&warmup_ts, NULL);
    }
 
    /* Map the tracking page.  The kernel requires this before any memory
@@ -1712,7 +1732,7 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
    kbase_bo->cpu_ptr = cpu_ptr;
    kbase_bo->gpu_mapping = cpu_ptr;
    kbase_bo->gpu_va = kbase_bo->same_va ? (uintptr_t)cpu_ptr : alloc_gpu_va;
-   fprintf(stderr, "[TRACE] bo_alloc: size=%lu va_pages=%lu same_va=%d cpu_ptr=%p gpu_va=0x%lx\n", (unsigned long)size, (unsigned long)va_pages, kbase_bo->same_va, cpu_ptr, (unsigned long)kbase_bo->gpu_va); fflush(stderr);
+   PANVK_TRACE_PRINTF( "[TRACE] bo_alloc: size=%lu va_pages=%lu same_va=%d cpu_ptr=%p gpu_va=0x%lx\n", (unsigned long)size, (unsigned long)va_pages, kbase_bo->same_va, cpu_ptr, (unsigned long)kbase_bo->gpu_va); fflush(stderr);
 
    /* Allocate a unique u32 handle for the pan_kmod handle_to_bo table. */
    uint32_t handle = p_atomic_inc_return(&kbase_dev->next_handle);
@@ -1784,9 +1804,29 @@ kbase_kmod_bo_export_fd(struct pan_kmod_bo *bo)
    struct kbase_kmod_bo *kbase_bo =
       container_of(bo, struct kbase_kmod_bo, base);
 
+   /* Native kbase BOs have no dma-buf. Wine/DXVK still calls
+    * vkGetMemoryFdKHR; returning ENOSYS becomes VK_ERROR_OUT_OF_DEVICE_MEMORY
+    * and winevulkan asserts. Give a private memfd so GetMemoryFd succeeds.
+    * This is not a real GPU dma-buf; present/WSI sharing may still be wrong.
+    */
    if (kbase_bo->dmabuf_fd < 0) {
-      errno = ENOSYS;
-      return -1;
+#if defined(__NR_memfd_create)
+      int fd = (int)syscall(__NR_memfd_create, "panvk-kbase-export", 1u);
+#else
+      int fd = memfd_create("panvk-kbase-export", 1);
+#endif
+      if (fd < 0) {
+         mesa_loge("kbase: memfd_create for export failed: %s", strerror(errno));
+         return -1;
+      }
+      if (ftruncate(fd, (off_t)bo->size) < 0) {
+         mesa_loge("kbase: ftruncate export memfd failed: %s", strerror(errno));
+         close(fd);
+         return -1;
+      }
+      kbase_bo->dmabuf_fd = fd;
+      fprintf(stderr, "PANVK-BUILD: export fallback memfd=%d size=%llu\n",
+              fd, (unsigned long long)bo->size);
    }
 
    return fcntl(kbase_bo->dmabuf_fd, F_DUPFD_CLOEXEC, 3);
@@ -2035,6 +2075,7 @@ kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t n
             s->atom_number = num;
             s->completed = s->errored = false;
             s->waiters = 1;
+            kd->atom_failed[num & 0xff] = false;
             s->nbo = MIN2(nbo, ARRAY_SIZE(s->bos));
             for (uint32_t j = 0; j < s->nbo; j++)
                s->bos[j] = bos[j];
@@ -2057,6 +2098,7 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
       if (kd->atoms[i].atom_number == ev->atom_number) {
          kd->atoms[i].completed = true;
          kd->atoms[i].errored = (ev->event_code != BASE_JD_EVENT_DONE);
+            kd->last_event_code[ev->atom_number & 0xff] = ev->event_code;
          return;
       }
    }
@@ -2075,15 +2117,28 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
    }
    for (;;) {
       simple_mtx_lock(&kd->atoms_lock);
+      bool present = false;
       for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
-         if (kd->atoms[i].atom_number == atom_num && kd->atoms[i].completed) {
+         if (kd->atoms[i].atom_number != atom_num)
+            continue;
+         present = true;
+         if (kd->atoms[i].completed) {
             bool ok = !kd->atoms[i].errored;
-            assert(kd->atoms[i].waiters > 0);
-            if (--kd->atoms[i].waiters == 0)
+            if (!ok)
+               kd->atom_failed[atom_num & 0xff] = true;
+            if (kd->atoms[i].waiters > 0 && --kd->atoms[i].waiters == 0)
                kd->atoms[i].atom_number = 0;
             simple_mtx_unlock(&kd->atoms_lock);
             return ok;
          }
+         break;
+      }
+      if (!present) {
+         /* Already completed and reaped by another waiter: the queue sync
+          * and every signal sync of a submit wait on the same atoms. */
+         bool ok = !kd->atom_failed[atom_num & 0xff];
+         simple_mtx_unlock(&kd->atoms_lock);
+         return ok;
       }
       simple_mtx_unlock(&kd->atoms_lock);
 
@@ -2100,9 +2155,9 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
       }
 
       struct pollfd pfd = { .fd = fd, .events = POLLIN };
-      fprintf(stderr, "[TRACE] wait_atom(%lu): poll() ms=%d\n", (unsigned long)atom_num, ms); fflush(stderr);
+      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): poll() ms=%d\n", (unsigned long)atom_num, ms); fflush(stderr);
       int r = poll(&pfd, 1, ms);
-      fprintf(stderr, "[TRACE] wait_atom(%lu): poll() returned r=%d revents=0x%x\n", (unsigned long)atom_num, r, pfd.revents); fflush(stderr);
+      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): poll() returned r=%d revents=0x%x\n", (unsigned long)atom_num, r, pfd.revents); fflush(stderr);
       if (r < 0) {
          if (errno == EINTR)
             continue;
@@ -2118,7 +2173,7 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
       } while (n < 0 && errno == EINTR);
 
 
-      fprintf(stderr, "[TRACE] wait_atom(%lu): read() n=%zd errno=%d event_code=0x%x event_atom=%u\n", (unsigned long)atom_num, n, errno, n==(ssize_t)sizeof(ev)?ev.event_code:0, n==(ssize_t)sizeof(ev)?ev.atom_number:0); fflush(stderr);
+      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): read() n=%zd errno=%d event_code=0x%x event_atom=%u\n", (unsigned long)atom_num, n, errno, n==(ssize_t)sizeof(ev)?ev.event_code:0, n==(ssize_t)sizeof(ev)?ev.atom_number:0); fflush(stderr);
       if (n == (ssize_t)sizeof(ev)) {
          simple_mtx_lock(&kd->atoms_lock);
          kbase_atom_process_event_locked(kd, &ev);
@@ -2170,6 +2225,54 @@ kbase_kmod_job_submit(struct pan_kmod_dev *dev,
       return 0;
    }
    return slot->atom_number;
+}
+
+/* Submit `jc` and block until it completes, retrying with backoff if the
+ * kernel reports it as TERMINATED. Used only for the very first job submitted
+ * on a queue: the kbase job-slot watchdog can spuriously terminate it before
+ * the GPU power domain has finished warming up.
+ * Returns true once a submission actually completes. */
+bool
+kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req, struct pan_kmod_bo **bos, uint32_t nbo, struct base_external_resource *ext_res, uint32_t next_res, int max_attempts)
+{
+   struct kbase_kmod_dev *kd = container_of(dev, struct kbase_kmod_dev, base);
+   (void)kd;
+   /* One attempt by default: retrying never helped in practice.
+    * PANVK_FIRST_JOB_RETRY=N restores up to N attempts. */
+   int attempts = 1;
+   const char *env = getenv("PANVK_FIRST_JOB_RETRY");
+   if (env && atoi(env) > 0)
+      attempts = atoi(env);
+   if (attempts > max_attempts)
+      attempts = max_attempts;
+
+   for (int attempt = 0; attempt < attempts; attempt++) {
+      uint64_t atom = kbase_kmod_job_submit(dev, jc, core_req, bos, nbo, ext_res, next_res);
+      if (!atom)
+         return false;
+
+      if (kbase_kmod_wait_atom(dev, atom, -1))
+         return true;
+
+      fprintf(stderr,
+              "PANVK-FIRSTJOB: attempt %d/%d failed atom=%llu event=0x%x core_req=0x%x jc=0x%llx nbo=%u\n",
+              attempt + 1, attempts, (unsigned long long)atom, (unsigned)kd->last_event_code[atom & 0xff],
+              (unsigned)core_req, (unsigned long long)jc, (unsigned)nbo);
+      for (uint32_t bi = 0; bos && bi < nbo && bi < 12; bi++) {
+         if (!bos[bi])
+            continue;
+         struct kbase_kmod_bo *kb = container_of(bos[bi], struct kbase_kmod_bo, base);
+         fprintf(stderr, "PANVK-FIRSTJOB:   bo[%u] va=0x%llx size=%llu\n", bi,
+                 (unsigned long long)kb->gpu_va, (unsigned long long)bos[bi]->size);
+      }
+      if (attempt + 1 < attempts) {
+         long delay_ms = 400L * (attempt + 1); /* 400,800,1200,1600,2000 ms */
+         struct timespec ts = { .tv_sec = delay_ms / 1000,
+                                 .tv_nsec = (delay_ms % 1000) * 1000000L };
+         nanosleep(&ts, NULL);
+      }
+   }
+   return false;
 }
 
 bool

@@ -36,6 +36,9 @@ uint64_t kbase_kmod_job_submit(struct pan_kmod_dev *dev,
 
 /* Block until the given JM job atom completes. timeout_ns < 0 waits forever.
  * Returns true if the atom completed without error. */
+bool kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req, struct pan_kmod_bo **bos, uint32_t nbo, struct base_external_resource *ext_res, uint32_t next_res,
+                                int max_attempts);
+
 bool kbase_kmod_wait_atom(struct pan_kmod_dev *dev, uint64_t atom_number,
                           int64_t timeout_ns);
 

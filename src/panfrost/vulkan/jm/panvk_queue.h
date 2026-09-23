@@ -19,6 +19,11 @@
 
 struct panvk_gpu_queue {
    struct vk_queue vk;
+   /* Set once the very first job on this queue has been submitted.
+    * Used to gate a synchronous retry-with-backoff, working around
+    * a kbase job-slot watchdog vs. cold GPU power domain. */
+   bool warmed_up;
+   bool frag_warmed_up;
    struct vk_sync *sync;
 };
 

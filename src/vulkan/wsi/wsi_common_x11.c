@@ -498,10 +498,7 @@ static const VkFormat formats[] = {
 };
 
 static const VkPresentModeKHR present_modes[] = {
-   VK_PRESENT_MODE_IMMEDIATE_KHR,
-   VK_PRESENT_MODE_MAILBOX_KHR,
-   VK_PRESENT_MODE_FIFO_KHR,
-   VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+   VK_PRESENT_MODE_FIFO_KHR, /* androidfinalv4: hide mailbox */
 };
 
 static xcb_screen_t *
@@ -1836,8 +1833,13 @@ x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
                                   divisor,
                                   remainder, 0, NULL);
    }
-   xcb_discard_reply(chain->conn, cookie.sequence);
+   xcb_generic_error_t *present_err = xcb_request_check(chain->conn, cookie);
    xcb_flush(chain->conn);
+   if (present_err) {
+      fprintf(stderr, "[PRESENT-ERRCHK] X error on present: error_code=%d major=%d minor=%d\n",
+              present_err->error_code, present_err->major_code, present_err->minor_code);
+      free(present_err);
+   }
    return x11_swapchain_result(chain, VK_SUCCESS);
 }
 #endif

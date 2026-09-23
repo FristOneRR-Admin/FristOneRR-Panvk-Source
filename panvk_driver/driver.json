@@ -1,0 +1,1 @@
+{"driver_name":"PanVK Custom Driver","version":"1.0","target_architecture":"aarch64","components":{"vulkan":{"library_name":"libvulkan_panvk.so","relative_path":"lib/libvulkan_panvk.so"}},"compatibility":{"gpu_family":"Mali-G57","runtime":"Winlator"}}

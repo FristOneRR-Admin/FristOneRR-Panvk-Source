@@ -60,6 +60,9 @@ panvk_image_can_use_afbc(
     * GetPhysicalDeviceImageFormatProperties2() and we don't have enough
     * information to conduct a full image property check in this context.
     */
+   if (fmt == VK_FORMAT_R8_UNORM)
+      return false; /* fontatlas4: DXVK font atlas stays linear */
+
    return !PANVK_DEBUG(NO_AFBC) &&
           !(usage &
             (VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT)) &&
@@ -211,10 +214,16 @@ panvk_image_can_use_mod(struct panvk_image *image,
    if (forced_linear)
       return mod == DRM_FORMAT_MOD_LINEAR;
 
+   if (image->vk.format == VK_FORMAT_R8_UNORM)
+      return mod == DRM_FORMAT_MOD_LINEAR; /* fontatlas6 */
+
    assert(image->vk.tiling == VK_IMAGE_TILING_OPTIMAL ||
           image->vk.tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT);
 
    if (drm_is_afbc(mod)) {
+      if (image->vk.format == VK_FORMAT_R8_UNORM)
+         return false; /* fontatlas5: DXVK font atlas stays linear */
+
       /* AFBC explicitly disabled. */
       if (PANVK_DEBUG(NO_AFBC))
          return false;

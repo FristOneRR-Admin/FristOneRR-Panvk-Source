@@ -21,6 +21,8 @@
  * IN THE SOFTWARE.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "wsi_common_private.h"
 #include "wsi_common_entrypoints.h"
 #include "util/u_debug.h"
@@ -119,7 +121,7 @@ wsi_device_init(struct wsi_device *wsi,
    assert(pdp2.properties.limits.optimalBufferCopyRowPitchAlignment <= UINT32_MAX);
    wsi->optimalBufferCopyRowPitchAlignment =
       pdp2.properties.limits.optimalBufferCopyRowPitchAlignment;
-   wsi->override_present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
+   wsi->override_present_mode = VK_PRESENT_MODE_FIFO_KHR; /* androidfinalv3 force fifo */
 
    GetPhysicalDeviceMemoryProperties(pdevice, &wsi->memory_props);
    GetPhysicalDeviceQueueFamilyProperties(pdevice, &wsi->queue_family_count, NULL);
@@ -1421,11 +1423,8 @@ wsi_GetPastPresentationTimingGOOGLE(VkDevice _device,
    return vr;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-wsi_CreateSwapchainKHR(VkDevice _device,
-                       const VkSwapchainCreateInfoKHR *pCreateInfo,
-                       const VkAllocationCallbacks *pAllocator,
-                       VkSwapchainKHR *pSwapchain)
+static VKAPI_ATTR VkResult VKAPI_CALL
+wsi_CreateSwapchainKHR_v10impl(VkDevice _device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
 {
    MESA_TRACE_FUNC();
    VK_FROM_HANDLE(vk_device, device, _device);
@@ -2279,8 +2278,14 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
    VK_FROM_HANDLE(wsi_swapchain, swapchain, pAcquireInfo->swapchain);
    VK_FROM_HANDLE(vk_device, device, _device);
 
+   fprintf(stderr, "[TEX5-ACQ] enter timeout=%llu swapchain=%p\n",
+           (unsigned long long)pAcquireInfo->timeout, (void*)swapchain);
+   fflush(stderr);
    VkResult result = swapchain->acquire_next_image(swapchain, pAcquireInfo,
                                                    pImageIndex);
+   fprintf(stderr, "[FristOneRR1] acquire_next_image result=0x%x idx=%u\n",
+           result, pImageIndex ? *pImageIndex : 0);
+   fflush(stderr);
    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
       return result;
    struct wsi_image *image =
@@ -3119,6 +3124,7 @@ wsi_create_buffer_blit_context(const struct wsi_swapchain *chain,
    };
    result = wsi->CreateBuffer(chain->device, &buffer_info,
                               &chain->alloc, &image->blit.buffer);
+   fprintf(stderr, "[WSI-BLIT] CreateBuffer result=%d size=%llu\n", result, (unsigned long long)info->linear_size); fflush(stderr);
    if (result != VK_SUCCESS)
       return result;
 
@@ -3172,11 +3178,13 @@ wsi_create_buffer_blit_context(const struct wsi_swapchain *chain,
 
    result = wsi->AllocateMemory(chain->device, &buf_mem_info,
                                 &chain->alloc, &image->blit.memory);
+   fprintf(stderr, "[WSI-BLIT] AllocateMemory(buf) result=%d typeIndex=%u\n", result, buf_mem_info.memoryTypeIndex); fflush(stderr);
    if (result != VK_SUCCESS)
       return result;
 
    result = wsi->BindBufferMemory(chain->device, image->blit.buffer,
                                   image->blit.memory, 0);
+   fprintf(stderr, "[WSI-BLIT] BindBufferMemory result=%d\n", result); fflush(stderr);
    if (result != VK_SUCCESS)
       return result;
 
@@ -3198,6 +3206,7 @@ wsi_create_buffer_blit_context(const struct wsi_swapchain *chain,
 
    result = wsi->AllocateMemory(chain->device, &memory_info,
                                 &chain->alloc, &image->memory);
+   fprintf(stderr, "[WSI-BLIT] AllocateMemory(img) result=%d typeIndex=%u\n", result, memory_info.memoryTypeIndex); fflush(stderr);
    if (result != VK_SUCCESS)
       return result;
 
@@ -3742,4 +3751,16 @@ wsi_SetHdrMetadataEXT(VkDevice device, uint32_t swapchainCount,
       if (swapchain->set_hdr_metadata)
          swapchain->set_hdr_metadata(swapchain, pMetadata);
    }
+}
+
+
+VKAPI_ATTR VkResult VKAPI_CALL
+wsi_CreateSwapchainKHR(VkDevice _device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
+{
+   VkResult v10r = wsi_CreateSwapchainKHR_v10impl(_device, pCreateInfo, pAllocator, pSwapchain);
+   if (v10r != VK_SUCCESS && getenv("PANVK_LOG_ERRORS") != NULL)
+      fprintf(stderr, "[WSIERR] vkCreateSwapchainKHR -> %d (minImageCount %u, %ux%u, format %d, presentMode %d)\n",
+              (int)v10r, pCreateInfo->minImageCount, pCreateInfo->imageExtent.width,
+              pCreateInfo->imageExtent.height, (int)pCreateInfo->imageFormat, (int)pCreateInfo->presentMode);
+   return v10r;
 }

@@ -1,0 +1,321 @@
+Core properties:
+  Source dir /data/data/com.termux/files/home/mesa
+  Build dir  /data/data/com.termux/files/home/mesa/build
+
+Global build options:
+  
+  Core options                   Current Value                    Possible Values                  Description                                                  
+  --------------                 -------------                    ---------------                  -----------                                                  
+  auto_features                  auto                             [enabled, disabled, auto]        Override value of all 'auto' features                        
+  backend                        ninja                            [ninja, vs, vs2010, vs2012,      Backend to use                                               
+                                                                   vs2013, vs2015, vs2017, vs2019,                                                              
+                                                                   vs2022, vs2026, xcode, none]                                                                 
+  genvslite                      vs2022                           [vs2022, vs2026]                 Setup multiple buildtype-suffixed ninja-backend build        
+                                                                                                   directories, and a [builddir]_vs containing a Visual Studio  
+                                                                                                   meta-backend with multiple configurations that calls into    
+                                                                                                   them                                                         
+  buildtype                      release                          [plain, debug, debugoptimized,   Build type to use                                            
+                                                                   release, minsize, custom]                                                                    
+  debug                          false                            [True, False]                    Enable debug symbols and other information                   
+  default_library                shared                           [shared, static, both]           Default library type                                         
+  default_both_libraries         shared                           [shared, static, auto]           Default library type for both_libraries                      
+  install_umask                  0022                             [>= 0, <= 511]                   Default umask to apply on permissions of installed files     
+  layout                         mirror                           [mirror, flat]                   Build directory layout                                       
+  optimization                   3                                [plain, 0, g, 1, 2, 3, s]        Optimization level                                           
+  prefer_static                  false                            [True, False]                    Whether to try static linking before shared linking          
+  strip                          false                            [True, False]                    Strip targets on install                                     
+  unity                          off                              [on, off, subprojects]           Unity build                                                  
+  unity_size                     4                                [>= 2]                           Unity block size                                             
+  warning_level                  1                                [0, 1, 2, 3, everything]         Compiler warning level to use                                
+  werror                         false                            [True, False]                    Treat warnings as errors                                     
+  wrap_mode                      default                          [default, nofallback,            Wrap mode                                                    
+                                                                   nodownload, forcefallback,                                                                   
+                                                                   nopromote]                                                                                   
+  force_fallback_for             []                                                                Force fallback for those subprojects                         
+  vsenv                          false                            [True, False]                    Activate Visual Studio environment                           
+  os2_emxomf                     false                            [True, False]                    Use OMF format on OS/2                                       
+  pkg_config_path                []                                                                List of additional paths for pkg-config to search            
+  cmake_prefix_path              []                                                                List of additional prefixes for cmake to search              
+  
+  Backend options                Current Value                    Possible Values                  Description                                                  
+  -----------------              -------------                    ---------------                  -----------                                                  
+  backend_max_links              0                                [>= 0]                           Maximum number of linker processes to run or 0 for no limit  
+  
+  Base options                   Current Value                    Possible Values                  Description                                                  
+  --------------                 -------------                    ---------------                  -----------                                                  
+  b_lto                          false                            [True, False]                    Use link time optimization                                   
+  b_pch                          true                             [True, False]                    Use precompiled headers                                      
+  b_coverage                     false                            [True, False]                    Enable coverage tracking.                                    
+  b_staticpic                    true                             [True, False]                    Build static libraries as position independent               
+  b_lundef                       true                             [True, False]                    Use -Wl,--no-undefined when linking                          
+  b_pgo                          off                              [off, generate, use]             Use profile guided optimization                              
+  b_lto_mode                     default                          [default, thin]                  Select between different LTO modes.                          
+  b_thinlto_cache                false                            [True, False]                    Use LLVM ThinLTO caching for faster incremental builds       
+  b_ndebug                       if-release                       [true, false, if-release]        Disable asserts                                              
+  b_thinlto_cache_dir                                                                              Directory to store ThinLTO cache objects                     
+  b_colorout                     always                           [auto, always, never]            Use colored output                                           
+  b_asneeded                     true                             [True, False]                    Use -Wl,--as-needed when linking                             
+  b_lto_threads                  0                                []                               Use multiple threads for Link Time Optimization              
+  b_sanitize                     []                                                                Code sanitizer to use                                        
+  b_pie                          false                            [True, False]                    Build executables as position independent                    
+  
+  Compiler options               Current Value                    Possible Values                  Description                                                  
+  ------------------             -------------                    ---------------                  -----------                                                  
+  c_args                         [-                                                                Extra arguments passed to the c compiler                     
+                                  I/data/data/com.termux/files/ho                                                                                               
+                                  me/mesa/include,                                                                                                              
+                                  --target=aarch64-linux-                                                                                                       
+                                  android36]                                                                                                                    
+  c_link_args                    [-llog, -lsync, -landroid-shmem]                                  Extra arguments passed to the c linker                       
+  c_std                          c11                              [none, c89, c99, c11, c17, c18,  c language standard to use                                   
+                                                                   c2x, c23, c2y, gnu89, gnu99,                                                                 
+                                                                   gnu11, gnu17, gnu18, gnu2x,                                                                  
+                                                                   gnu23, gnu2y]                                                                                
+  cpp_args                       [-                                                                Extra arguments passed to the cpp compiler                   
+                                  I/data/data/com.termux/files/ho                                                                                               
+                                  me/mesa/include,                                                                                                              
+                                  --target=aarch64-linux-                                                                                                       
+                                  android36]                                                                                                                    
+  cpp_link_args                  [-llog, -lsync, -landroid-shmem]                                  Extra arguments passed to the cpp linker                     
+  cpp_std                        c++17                            [none, c++98, c++03, c++11,      cpp language standard to use                                 
+                                                                   c++14, c++17, c++1z, c++2a,                                                                  
+                                                                   c++20, c++23, c++26, gnu++98,                                                                
+                                                                   gnu++03, gnu++11, gnu++14,                                                                   
+                                                                   gnu++17, gnu++1z, gnu++2a,                                                                   
+                                                                   gnu++20, gnu++23, gnu++26]                                                                   
+  cpp_eh                         default                          [none, default, a, s, sc]        C++ exception handling type.                                 
+  cpp_rtti                       true                             [True, False]                    Enable RTTI                                                  
+  cpp_debugstl                   false                            [True, False]                    STL debug mode                                               
+  
+  pkgconfig module options       Current Value                    Possible Values                  Description                                                  
+  --------------------------     -------------                    ---------------                  -----------                                                  
+  pkgconfig.relocatable          false                            [True, False]                    Generate pkgconfig files as relocatable                      
+  
+  Directories                    Current Value                    Possible Values                  Description                                                  
+  -------------                  -------------                    ---------------                  -----------                                                  
+  prefix                         /data/data/com.termux/files/usr                                   Installation prefix                                          
+  bindir                         bin                                                               Executable directory                                         
+  datadir                        share                                                             Data file directory                                          
+  includedir                     include                                                           Header file directory                                        
+  infodir                        share/info                                                        Info page directory                                          
+  libdir                         lib                                                               Library directory                                            
+  licensedir                                                                                       Licenses directory                                           
+  libexecdir                     libexec                                                           Library executable directory                                 
+  localedir                      share/locale                                                      Locale data directory                                        
+  localstatedir                  /var/local                                                        Localstate data directory                                    
+  mandir                         share/man                                                         Manual page directory                                        
+  sbindir                        sbin                                                              System executable directory                                  
+  sharedstatedir                 /var/local/lib                                                    Architecture-independent data directory                      
+  sysconfdir                     etc                                                               Sysconf data directory                                       
+  
+  Testing options                Current Value                    Possible Values                  Description                                                  
+  -----------------              -------------                    ---------------                  -----------                                                  
+  errorlogs                      true                             [True, False]                    Whether to print the logs from failing tests                 
+  stdsplit                       true                             [True, False]                    Split stdout and stderr in test logs                         
+  
+  Project options                Current Value                    Possible Values                  Description                                                  
+  -----------------              -------------                    ---------------                  -----------                                                  
+  allow-broken-lto               false                            [True, False]                    Manual override switch to enable LTO, which is unsupported   
+                                                                                                   due to being broken. WARNING: This option may break your     
+                                                                                                   driver randomly!                                             
+  allow-fallback-for             [perfetto]                       [libdrm, libva, perfetto]        Allows the fallback mechanism if the dependency is not       
+                                                                                                   available on the system, or too old.                         
+  allow-kcmp                     auto                             [enabled, disabled, auto]        Allow using KCMP_FILE to compare file descriptions. auto =   
+                                                                                                   allowed everywhere except on Android                         
+  amd-use-llvm                   true                             [True, False]                    Whether to use LLVM for the AMD drivers, if LLVM is included.
+  amdgpu-virtio                  false                            [True, False]                    use experimental virtio backend for radeonsi/radv            
+  android-libbacktrace           auto                             [enabled, disabled, auto]        Use Android's libbacktrace                                   
+  android-libperfetto            auto                             [enabled, disabled, auto]        Use Android's libperfetto                                    
+  android-strict                 true                             [True, False]                    Enable strict Android compliance. Disabling may cause CTS    
+                                                                                                   failures or other problems, but allows drivers to expose     
+                                                                                                   capabilities that are normally hidden. Default: true         
+  android-stub                   false                            [True, False]                    Build against android-stub                                   
+  build-aco-tests                false                            [True, False]                    Build ACO tests. These require RADV and glslang but not an   
+                                                                                                   AMD GPU.                                                     
+  build-radv-tests               false                            [True, False]                    Build RADV tests. These do not require an AMD GPU.           
+  build-tests                    false                            [True, False]                    Build unit tests. Currently this will build *all* unit tests 
+                                                                                                   except the ACO tests, which may build more than expected.    
+  custom-shader-replacement                                                                        Enable a custom shader replacement mechanism. Note that      
+                                                                                                   enabling this option requires adding/generating a            
+                                                                                                   shader_replacement.h file that can be included (see          
+                                                                                                   shaderapi.c).                                                
+  d3d-drivers-path                                                                                 Location of D3D drivers. Default: $libdir/d3d                
+  datasources                    [auto]                           [auto, panfrost, intel,          List of Perfetto datasources to build. If this is set to     
+                                                                   freedreno]                      `auto`, datasources that can not be build are skipped.       
+                                                                                                   Default: [`auto`]                                            
+  display-info                   auto                             [enabled, disabled, auto]        Use libdisplay-info to build driver.                         
+  draw-use-llvm                  true                             [True, False]                    Whether to use LLVM for the Gallium draw module, if LLVM is  
+                                                                                                   included.                                                    
+  dri-drivers-path                                                                                 Location to install dri drivers. Default: $libdir/dri.       
+  egl                            disabled                         [enabled, disabled, auto]        Build support for EGL platform                               
+  egl-lib-suffix                                                                                   Suffix to append to EGL library name.  Default: none.        
+  egl-native-platform            auto                             [auto, x11, haiku, android,      the window system EGL assumes for EGL_DEFAULT_DISPLAY        
+                                                                   surfaceless]                                                                                 
+  enable-glcpp-tests             true                             [True, False]                    Build glcpp unit tests. These are flaky on CI.               
+  execmem                        true                             [True, False]                    Does nothing, left here for a while to avoid build breakages.
+  expat                          auto                             [enabled, disabled, auto]        Controls the use of expat. Cannot be disabled if xmlconfig is
+                                                                                                   enabled.                                                     
+  freedreno-kmds                 [msm]                            [msm, kgsl, virtio, wsl]         List of kernel-mode drivers to enable for freedreno gallium  
+                                                                                                   and vulkan driver                                            
+  gallium-d3d10-dll-name         libgallium_d3d10                                                  name of gallium d3d10 target DLL built for Windows. defaults 
+                                                                                                   to libgallium_d3d10.dll to match DRI                         
+  gallium-d3d10umd               false                            [True, False]                    build gallium D3D10 WDDM UMD frontend.                       
+  gallium-d3d12-graphics         auto                             [enabled, disabled, auto]        build gallium d3d12 with graphics pipeline support.          
+  gallium-d3d12-video            auto                             [enabled, disabled, auto]        build gallium d3d12 with video support.                      
+  gallium-drivers                []                               [all, auto, asahi, crocus,       List of gallium drivers to build. If this is set to auto all 
+                                                                   d3d12, ethosu, etnaviv,         drivers applicable to the target OS/architecture will be     
+                                                                   freedreno, i915, iris, lima,    built.                                                       
+                                                                   llvmpipe, nouveau, panfrost,                                                                 
+                                                                   r300, r600, radeonsi, rocket,                                                                
+                                                                   softpipe, svga, tegra, v3d,                                                                  
+                                                                   vc4, virgl, zink]                                                                            
+  gallium-extra-hud              false                            [True, False]                    Enable HUD block/NIC I/O HUD status support                  
+  gallium-mediafoundation        auto                             [enabled, disabled, auto]        enable gallium mediafoundation frontend.                     
+  gallium-mediafoundation-test   false                            [True, False]                    enable gallium mediafoundation frontend tests.               
+  gallium-rusticl                false                            [True, False]                    build gallium "rusticl" OpenCL frontend.                     
+  gallium-rusticl-enable-drivers [auto]                           [auto, asahi, freedreno,         List of gallium drivers for which rusticl will be enabled by 
+                                                                   panfrost, radeonsi]             default                                                      
+  gallium-va                     auto                             [enabled, disabled, auto]        enable gallium va frontend.                                  
+  gallium-wgl-dll-name           libgallium_wgl                                                    name of gallium wgl target DLL built for Windows. defaults to
+                                                                                                   libgallium_wgl.dll to match DRI                              
+  gbm                            disabled                         [enabled, disabled, auto]        Build support for gbm platform                               
+  gbm-backends-path                                                                                Locations to search for gbm backends, passed as colon        
+                                                                                                   separated list. Default: $libdir/gbm.                        
+  gles-lib-suffix                                                                                  Suffix to append to GLES library names.  Default: none.      
+  gles1                          disabled                         [enabled, disabled, auto]        Build support for OpenGL ES 1.x                              
+  gles2                          disabled                         [enabled, disabled, auto]        Build support for OpenGL ES 2.x and 3.x                      
+  glvnd                          auto                             [enabled, disabled, auto]        Enable GLVND support.                                        
+  glvnd-vendor-name              mesa                                                              Vendor name string to use for glvnd libraries                
+  glx                            disabled                         [auto, disabled, dri, xlib]      Build support for GLX platform                               
+  glx-direct                     true                             [True, False]                    Enable direct rendering in GLX and EGL for DRI               
+  glx-read-only-text             false                            [True, False]                    Disable writable .text section on x86 (decreases performance)
+  gpuvis                         false                            [True, False]                    Enable tracing markers for gpuvis. Default: false            
+  html-docs                      disabled                         [enabled, disabled, auto]        Build HTML documentation.                                    
+  html-docs-path                                                                                   Location to install HTML documentation. Default:             
+                                                                                                   $datadir/doc/mesa.                                           
+  imagination-srv                false                            [True, False]                    Enable Services backend for Imagination Technologies vulkan  
+                                                                                                   driver                                                       
+  imagination-uscgen-devices     []                               [axe-1-16m, bxs-4-64, gx6250]    List of devices for which to pre-build USC program binaries. 
+  install-intel-gpu-tests        false                            [True, False]                    Build and install Intel unit tests which require the GPU.    
+                                                                                                   This option is for developers and the Intel CI system only.  
+  install-mesa-clc               false                            [True, False]                    Install the mesa-clc compiler (if needed for cross builds).  
+  install-precomp-compiler       false                            [True, False]                    Install the drivers internal shader compilers (if needed for 
+                                                                                                   cross builds).                                               
+  intel-elk                      true                             [True, False]                    Build ELK compiler (used for Gfx8 and earlier). This is      
+                                                                                                   required for Crocus and Hasvk, and it is optional for Iris   
+                                                                                                   and various developer tools.                                 
+  intel-rt                       auto                             [enabled, disabled, auto]        Build Ray Tracing on supported hardware.                     
+  intel-virtio-experimental      false                            [True, False]                    use experimental virtio backend for intel driver             
+  legacy-wayland                 []                               [bind-wayland-display]           Build legacy Wayland support features.                       
+  legacy-x11                     []                               []                               Build legacy X11 support features.                           
+  libgbm-external                false                            [True, False]                    Whether to use external libgbm (default: use in-tree copy)   
+  libunwind                      auto                             [enabled, disabled, auto]        Use libunwind for stack-traces                               
+  llvm                           auto                             [enabled, disabled, auto]        Build with LLVM support.                                     
+  llvm-orcjit                    false                            [True, False]                    Build llvmpipe with LLVM ORCJIT support. Has no effect when  
+                                                                                                   building for architectures without LLVM MCJIT support --     
+                                                                                                   ORCJIT is the only choice on such architectures and will     
+                                                                                                   always be enabled.                                           
+  lmsensors                      auto                             [enabled, disabled, auto]        Enable HUD lmsensors support.                                
+  mediafoundation-codecs         [all]                            [all, h264enc, h265enc, av1enc]  List of codecs to build mediafoundation frontend DLLs for.   
+                                                                                                   These will generate different MFT DLLs per codec and         
+                                                                                                   linkagainst the gallium drivers which uses the video-codecs  
+                                                                                                   option                                                       
+  mediafoundation-store-dll      false                            [True, False]                    Selects whether the gallium mediafoundation DLL is built for 
+                                                                                                   the store.                                                   
+  mesa-clc                       auto                             [enabled, system, auto]          Build the mesa-clc compiler or use a system version.         
+  mesa-clc-bundle-headers        auto                             [enabled, auto]                  Bundle the OpenCL headers into the mesa-clc binary (default  
+                                                                                                   to bundle if static LLVM is used). Note, it might require    
+                                                                                                   rebuilding mesa-clc if opencl-c.h or opencl-c-base.h are     
+                                                                                                   changed (e.g. on Clang upgrades).                            
+  microsoft-clc                  auto                             [enabled, disabled, auto]        Build support for the Microsoft CLC to DXIL compiler         
+  min-windows-version            8                                [>= 7, <= 11]                    Minimum Windows version to support. Defaults to Windows 8.   
+  moltenvk-dir                                                                                     Location of the MoltenVk SDK. Default:                       
+  nvk-build-id                                                                                     Override build id for shader cache keys (hex string). Can be 
+                                                                                                   extracted with readelf -x .note.gnu.build-id                 
+  opengl                         true                             [True, False]                    Build support for desktop OpenGL                             
+  panfrost-kmds                  [panfrost, kbase]                [panfrost, panthor, kbase]       List of kernel-mode drivers to enable for panfrost gallium   
+                                                                                                   and vulkan driver                                            
+  panfrost-rust                  false                            [True, False]                    Build panfrost Rust components.                              
+  perfetto                       false                            [True, False]                    Enable performance analysis with Perfetto. Default: false    
+  platform-sdk-version           35                               [>= 25, <= 10000]                Android Platform SDK version. Default: Android15 version.    
+  platforms                      [x11]                            [auto, x11, wayland, haiku,      window systems to support. If this is set to `auto`, all     
+                                                                   android, windows, macos]        platforms applicable will be enabled.                        
+  power8                         auto                             [enabled, disabled, auto]        Does nothing, left here for a while to avoid build breakages.
+  precomp-compiler               auto                             [enabled, system, auto]          Build drivers internal shader compilers or use a system      
+                                                                                                   version                                                      
+  radeonsi-build-id                                                                                Override build id for shader cache keys (hex string). Can be 
+                                                                                                   extracted with readelf -x .note.gnu.build-id                 
+  radv-build-id                                                                                    Override build id for shader cache keys (hex string). Can be 
+                                                                                                   extracted with readelf -x .note.gnu.build-id                 
+  radv-u_trace                   false                            [True, False]                    Enable u_trace profiling features.                           
+  selinux                        true                             [True, False]                    Does nothing, left here for a while to avoid build breakages.
+  shader-cache                   auto                             [enabled, disabled, auto]        Build with on-disk shader cache support.                     
+  shader-cache-default           true                             [True, False]                    If set to false, the feature is only activated when          
+                                                                                                   environment variable MESA_SHADER_CACHE_DISABLE is set to     
+                                                                                                   false                                                        
+  shader-cache-max-size                                                                            Default value for MESA_SHADER_CACHE_MAX_SIZE enviroment      
+                                                                                                   variable. If set, determines the maximum size of the on-disk 
+                                                                                                   cache of compiled shader programs, can be overriden by       
+                                                                                                   enviroment variable if needed. Should be set to a number     
+                                                                                                   optionally followed by ``K``, ``M``, or ``G`` to specify a   
+                                                                                                   size in kilobytes, megabytes, or gigabytes. By default,      
+                                                                                                   gigabytes will be assumed. And if unset, a maximum size of   
+                                                                                                   1GB will be used.                                            
+  shared-glapi                   auto                             [enabled, disabled, auto]        Does nothing, left here for a while to avoid build breakages.
+  shared-llvm                    auto                             [enabled, disabled, auto]        Whether to link LLVM shared or statically.                   
+  spirv-to-dxil                  false                            [True, False]                    Build support for the SPIR-V to DXIL library                 
+  spirv-tools                    auto                             [enabled, disabled, auto]        Use SPIRV-Tools for dumping SPIR-V for debugging purposes    
+                                                                                                   (required by CLC)                                            
+  split-debug                    disabled                         [enabled, disabled, auto]        split debug information (-gsplit-dwarf compile flag) and     
+                                                                                                   debug information in the gdb index format (--gdb-index)      
+  sse2                           true                             [True, False]                    use msse2 flag for x86. Uses sse/sse2 instead of x87.        
+                                                                                                   Default: true                                                
+  static-libclc                  []                               [spirv, spirv64, all]            Link libclc SPIR-V statically.                               
+  sysprof                        false                            [True, False]                    Enable tracing markers for sysprof. Default: false           
+  teflon                         false                            [True, False]                    Enable TensorFlow Lite delegate. Default: false              
+  tools                          []                               [amd, asahi, dlclose-skip, drm-  List of tools to build. (Note: `intel-ui` selects `intel`)   
+                                                                   shim, etnaviv, freedreno,                                                                    
+                                                                   gamma, glsl, imagination,                                                                    
+                                                                   intel, intel-ui, lima, nir,                                                                  
+                                                                   nouveau, panfrost, zink, all]                                                                
+  tu-build-id                                                                                      Override build id for shader cache keys (hex string).        
+  unversion-libgallium           false                            [True, False]                    Do not include mesa version in libgallium DSO filename. Do   
+                                                                                                   not enable unless you know what you are doing. Default: false
+  va-libs-path                                                                                     path to put va libraries. defaults to $libdir/dri.           
+  valgrind                       auto                             [enabled, disabled, auto]        Build with valgrind support                                  
+  video-codecs                   [all_free]                       [all, all_free, vc1dec, h264dec, List of codecs to build support for. Distros might want to   
+                                                                   h264enc, h265dec, h265enc,      consult their legal department before enabling these. This is
+                                                                   av1dec, av1enc, vp9dec,         used for all video APIs (vaapi, vulkan). Non-patent          
+                                                                   mpeg12dec, jpegdec]             encumbered codecs will be enabled by default with the        
+                                                                                                   all_free default value.                                      
+  virtgpu_kumquat                false                            [True, False]                    Build virtgpu_kumquat (only useful with gfxstream currently) 
+  vmware-mks-stats               false                            [True, False]                    Build gallium VMware/svga driver with mksGuestStats          
+                                                                                                   instrumentation.                                             
+  vulkan-beta                    false                            [True, False]                    Build vulkan drivers with BETA extensions enabled.           
+  vulkan-drivers                 [panfrost]                       [auto, amd, broadcom, freedreno, List of vulkan drivers to build. If this is set to auto all  
+                                                                   intel, intel_hasvk, panfrost,   drivers applicable to the target OS/architecture will be     
+                                                                   swrast, virtio, imagination,    built                                                        
+                                                                   microsoft-experimental,                                                                      
+                                                                   nouveau, asahi, gfxstream,                                                                   
+                                                                   kosmickrisp, all]                                                                            
+  vulkan-icd-dir                                                                                   Location relative to prefix to put vulkan icds on install.   
+                                                                                                   Default: $datadir/vulkan/icd.d                               
+  vulkan-layers                  []                               [device-select, intel-nullhw,    List of vulkan layers to build                               
+                                                                   overlay, screenshot, anti-lag,                                                               
+                                                                   vram-report-limit]                                                                           
+  vulkan-loader-rpath            /usr/local/lib                                                    The path where the vulkan loader (libvulkan.1.dylib) exists  
+                                                                                                   at runtime.Defaults to /usr/local/lib since that is where the
+                                                                                                   Vulkan SDK installs it to by default.                        
+  vulkan-manifest-per-           true                             [True, False]                    If true, Vulkan ICDs have a separate JSON manifest per       
+architecture                                                                                       architecture, for example lvp_icd.x86_64.json. (Recommended  
+                                                                                                   for non-default ${prefix}.) If false, all architectures share
+                                                                                                   a single JSON manifest, for example lvp_icd.json, referencing
+                                                                                                   the library by its basename. (Recommended for Unix OS distros
+                                                                                                   installing into /usr.)                                       
+  xlib-lease                     auto                             [enabled, disabled, auto]        Enable VK_EXT_acquire_xlib_display.                          
+  xmlconfig                      auto                             [enabled, disabled, auto]        Build custom xmlconfig (driconf) support. If disabled, the   
+                                                                                                   default driconf file is hardcoded into Mesa. Requires expat. 
+  zlib                           enabled                          [enabled, disabled, auto]        Use ZLIB to build driver. Default: enabled                   
+  zstd                           auto                             [enabled, disabled, auto]        Use ZSTD instead of ZLIB in some cases.                      
+
+There are no option augments.

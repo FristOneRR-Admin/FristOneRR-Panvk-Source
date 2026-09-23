@@ -123,6 +123,9 @@ _vk_queue_set_lost(struct vk_queue *queue,
    queue->_lost.error_file = file;
    queue->_lost.error_line = line;
 
+   fprintf(stderr, "[QUEUE-LOST] %s:%d msg=%s\n", file, line, msg);
+   fflush(stderr);
+
    va_list ap;
    va_start(ap, msg);
    vsnprintf(queue->_lost.error_msg, sizeof(queue->_lost.error_msg), msg, ap);

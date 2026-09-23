@@ -9,6 +9,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../../lib/pan_trace_gate.h"
 #include "genxml/gen_macros.h"
 
 #include "panvk_buffer.h"
@@ -44,16 +45,28 @@ panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
    if (!job_ptr.gpu)
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
-   fprintf(stderr, "[FRAGJOB-CHECK] tiling_area min=(%d,%d) max=(%d,%d) w=%u h=%u fbd=0x%llx\n",
+   PANVK_TRACE_PRINTF( "[FRAGJOB-CHECK] tiling_area min=(%d,%d) max=(%d,%d) w=%u h=%u fbd=0x%llx\n",
            fb->tiling_area_px.min_x, fb->tiling_area_px.min_y,
            fb->tiling_area_px.max_x, fb->tiling_area_px.max_y,
            fb->width_px, fb->height_px, (unsigned long long)fbd);
+   int minx = fb->tiling_area_px.min_x;
+   int miny = fb->tiling_area_px.min_y;
+   int maxx = fb->tiling_area_px.max_x;
+   int maxy = fb->tiling_area_px.max_y;
+   if (maxx <= minx)
+      maxx = minx + 1;
+   if (maxy <= miny)
+      maxy = miny + 1;
+   if (fb->width_px <= 1 || fb->height_px <= 1) {
+      fprintf(stderr, "[FONTATLAS9] one-tile fragment job w=%u h=%u min=(%d,%d) max=(%d,%d)\n",
+              fb->width_px, fb->height_px, minx, miny, maxx, maxy);
+      fflush(stderr);
+   }
    pan_section_pack(job_ptr.cpu, FRAGMENT_JOB, PAYLOAD, payload) {
-      assert(pan_fb_bbox_is_valid(fb->tiling_area_px));
-      payload.bound_min_x = fb->tiling_area_px.min_x >> MALI_TILE_SHIFT;
-      payload.bound_min_y = fb->tiling_area_px.min_y >> MALI_TILE_SHIFT;
-      payload.bound_max_x = fb->tiling_area_px.max_x >> MALI_TILE_SHIFT;
-      payload.bound_max_y = fb->tiling_area_px.max_y >> MALI_TILE_SHIFT;
+      payload.bound_min_x = minx >> MALI_TILE_SHIFT;
+      payload.bound_min_y = miny >> MALI_TILE_SHIFT;
+      payload.bound_max_x = maxx >> MALI_TILE_SHIFT;
+      payload.bound_max_y = maxy >> MALI_TILE_SHIFT;
 
       payload.framebuffer = fbd;
    }
@@ -195,13 +208,7 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
          };
          tagged_fbd_ptr |= GENX(pan_emit_fb_desc)(&fbd_info, &fb_descs);
 
-         fprintf(stderr, "[FBD-CHECK] fbd.cpu=%p fbd.gpu=0x%llx tagged=0x%llx rts_cpu=%p\n",
-                 fbd.cpu, (unsigned long long)fbd.gpu,
-                 (unsigned long long)tagged_fbd_ptr, fb_descs.rts);
-         fprintf(stderr, "[FBD-CHECK] RT0 raw bytes: ");
-         for (int b = 0; b < 64; b++)
-            fprintf(stderr, "%02x ", ((unsigned char *)fb_descs.rts)[b]);
-         fprintf(stderr, "\n");
+         /* fontatlas8: no FBD hex dump */
 
          result = panvk_cmd_prepare_fragment_job(cmdbuf, tagged_fbd_ptr);
          if (result != VK_SUCCESS)

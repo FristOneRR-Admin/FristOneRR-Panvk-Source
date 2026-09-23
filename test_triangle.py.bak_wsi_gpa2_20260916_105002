@@ -1,0 +1,589 @@
+#!/usr/bin/env python3
+import os, sys, time
+from ctypes import *
+
+os.environ["PAN_I_WANT_A_BROKEN_VULKAN_DRIVER"] = "1"
+
+# Vulkan constants
+VK_STRUCTURE_TYPE_APPLICATION_INFO = 0
+VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1
+VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3
+VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO = 18
+VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO = 19
+VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO = 20
+VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO = 22
+VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO = 23
+VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO = 24
+VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO = 25
+VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO = 27
+VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO = 28
+VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO = 29
+VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO = 31
+VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO = 32
+VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 33
+VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 34
+VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 35
+VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO = 42
+VK_STRUCTURE_TYPE_SUBMIT_INFO = 4
+VK_STRUCTURE_TYPE_PRESENT_INFO_KHR = 1000001001
+VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO = 5
+VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 6
+VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO = 36
+VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO = 37
+VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO = 38
+VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO = 10
+VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR = 1000009000
+VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR = 1000001000
+
+VK_API_VERSION_1_0 = (1 << 22)
+VK_QUEUE_GRAPHICS_BIT = 1
+VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT = 16
+VK_SHARING_MODE_EXCLUSIVE = 0
+VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR = 16
+VK_PRESENT_MODE_FIFO_KHR = 0
+VK_IMAGE_VIEW_TYPE_2D = 1
+VK_IMAGE_ASPECT_COLOR_BIT = 1
+VK_IMAGE_LAYOUT_UNDEFINED = 0
+VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL = 2
+VK_IMAGE_LAYOUT_PRESENT_SRC_KHR = 1000001002
+VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT = 256
+VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT = 1
+VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT = 64
+VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT = 4096
+VK_SUCCESS = 0
+VK_SUBOPTIMAL_KHR = 1000001003
+VK_SHADER_STAGE_VERTEX_BIT = 1
+VK_SHADER_STAGE_FRAGMENT_BIT = 8
+VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 4
+VK_POLYGON_MODE_FILL = 0
+VK_CULL_MODE_NONE = 0
+VK_FRONT_FACE_CLOCKWISE = 1
+VK_DYNAMIC_STATE_VIEWPORT = 0
+VK_DYNAMIC_STATE_SCISSOR = 1
+VK_BLEND_FACTOR_ZERO = 2
+VK_BLEND_FACTOR_ONE = 3
+VK_BLEND_OP_ADD = 0
+VK_LOGIC_OP_COPY = 3
+VK_IMAGE_TYPE_2D = 1
+VK_SAMPLE_COUNT_1_BIT = 1
+VK_COLOR_COMPONENT_R_BIT = 1
+VK_COLOR_COMPONENT_G_BIT = 2
+VK_COLOR_COMPONENT_B_BIT = 4
+VK_COLOR_COMPONENT_A_BIT = 8
+
+VkInstance = c_void_p
+VkPhysicalDevice = c_void_p
+VkDevice = c_void_p
+VkQueue = c_void_p
+VkSurfaceKHR = c_uint64
+VkSwapchainKHR = c_uint64
+VkImage = c_uint64
+VkImageView = c_uint64
+VkShaderModule = c_uint64
+VkPipelineLayout = c_uint64
+VkPipeline = c_uint64
+VkRenderPass = c_uint64
+VkFramebuffer = c_uint64
+VkCommandPool = c_uint64
+VkCommandBuffer = c_void_p
+VkSemaphore = c_uint64
+VkFence = c_uint64
+VkDescriptorSetLayout = c_uint64
+VkDescriptorSet = c_uint64
+
+class VkApplicationInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("pApplicationName", c_char_p), ("applicationVersion", c_uint32), ("pEngineName", c_char_p), ("engineVersion", c_uint32), ("apiVersion", c_uint32)]
+
+class VkInstanceCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("pApplicationInfo", c_void_p), ("enabledLayerCount", c_uint32), ("ppEnabledLayerNames", c_void_p), ("enabledExtensionCount", c_uint32), ("ppEnabledExtensionNames", c_void_p)]
+
+class VkXcbSurfaceCreateInfoKHR(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("connection", c_void_p), ("window", c_uint32)]
+
+class VkQueueFamilyProperties(Structure):
+    _fields_ = [("queueFlags", c_uint32), ("queueCount", c_uint32), ("timestampValidBits", c_uint32), ("minImageTransferGranularity", c_uint32 * 3)]
+
+class VkDeviceQueueCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("queueFamilyIndex", c_uint32), ("queueCount", c_uint32), ("pQueuePriorities", c_void_p)]
+
+class VkDeviceCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("queueCreateInfoCount", c_uint32), ("pQueueCreateInfos", c_void_p), ("enabledLayerCount", c_uint32), ("ppEnabledLayerNames", c_void_p), ("enabledExtensionCount", c_uint32), ("ppEnabledExtensionNames", c_void_p), ("pEnabledFeatures", c_void_p)]
+
+class VkSurfaceCapabilitiesKHR(Structure):
+    _fields_ = [("minImageCount", c_uint32), ("maxImageCount", c_uint32), ("currentExtent", c_uint32 * 2), ("minImageExtent", c_uint32 * 2), ("maxImageExtent", c_uint32 * 2), ("maxImageArrayLayers", c_uint32), ("supportedTransforms", c_uint32), ("currentTransform", c_uint32), ("supportedCompositeAlpha", c_uint32), ("supportedUsageFlags", c_uint32)]
+
+class VkSurfaceFormatKHR(Structure):
+    _fields_ = [("format", c_uint32), ("colorSpace", c_uint32)]
+
+class VkSwapchainCreateInfoKHR(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("surface", VkSurfaceKHR), ("minImageCount", c_uint32), ("imageFormat", c_uint32), ("imageColorSpace", c_uint32), ("imageExtent", c_uint32 * 2), ("imageArrayLayers", c_uint32), ("imageUsage", c_uint32), ("imageSharingMode", c_uint32), ("queueFamilyIndexCount", c_uint32), ("pQueueFamilyIndices", c_void_p), ("preTransform", c_uint32), ("compositeAlpha", c_uint32), ("presentMode", c_uint32), ("clipped", c_bool), ("oldSwapchain", VkSwapchainKHR)]
+
+class VkImageViewCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("image", VkImage), ("viewType", c_uint32), ("format", c_uint32), ("components", c_uint32 * 4), ("subresourceRange", c_uint32 * 5)]
+
+class VkShaderModuleCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("codeSize", c_uint32), ("pCode", c_void_p)]
+
+class VkPipelineShaderStageCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("stage", c_uint32), ("module", VkShaderModule), ("pName", c_char_p), ("pSpecializationInfo", c_void_p)]
+
+class VkVertexInputBindingDescription(Structure):
+    _fields_ = [("binding", c_uint32), ("stride", c_uint32), ("inputRate", c_uint32)]
+
+class VkVertexInputAttributeDescription(Structure):
+    _fields_ = [("location", c_uint32), ("binding", c_uint32), ("format", c_uint32), ("offset", c_uint32)]
+
+class VkPipelineVertexInputStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("vertexBindingDescriptionCount", c_uint32), ("pVertexBindingDescriptions", c_void_p), ("vertexAttributeDescriptionCount", c_uint32), ("pVertexAttributeDescriptions", c_void_p)]
+
+class VkPipelineInputAssemblyStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("topology", c_uint32), ("primitiveRestartEnable", c_bool)]
+
+class VkViewport(Structure):
+    _fields_ = [("x", c_float), ("y", c_float), ("width", c_float), ("height", c_float), ("minDepth", c_float), ("maxDepth", c_float)]
+
+class VkRect2D(Structure):
+    _fields_ = [("offset", c_int32 * 2), ("extent", c_uint32 * 2)]
+
+class VkPipelineViewportStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("viewportCount", c_uint32), ("pViewports", c_void_p), ("scissorCount", c_uint32), ("pScissors", c_void_p)]
+
+class VkPipelineRasterizationStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("depthClampEnable", c_bool), ("rasterizerDiscardEnable", c_bool), ("polygonMode", c_uint32), ("lineWidth", c_float), ("cullMode", c_uint32), ("frontFace", c_uint32), ("depthBiasEnable", c_bool), ("depthBiasConstantFactor", c_float), ("depthBiasClamp", c_float), ("depthBiasSlopeFactor", c_float)]
+
+class VkPipelineMultisampleStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("rasterizationSamples", c_uint32), ("sampleShadingEnable", c_bool), ("minSampleShading", c_float), ("pSampleMask", c_void_p), ("alphaToCoverageEnable", c_bool), ("alphaToOneEnable", c_bool)]
+
+class VkPipelineColorBlendAttachmentState(Structure):
+    _fields_ = [("blendEnable", c_bool), ("srcColorBlendFactor", c_uint32), ("dstColorBlendFactor", c_uint32), ("colorBlendOp", c_uint32), ("srcAlphaBlendFactor", c_uint32), ("dstAlphaBlendFactor", c_uint32), ("alphaBlendOp", c_uint32), ("colorWriteMask", c_uint32)]
+
+class VkPipelineColorBlendStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("logicOpEnable", c_bool), ("logicOp", c_uint32), ("attachmentCount", c_uint32), ("pAttachments", c_void_p), ("blendConstants", c_float * 4)]
+
+class VkPipelineDepthStencilStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("depthTestEnable", c_bool), ("depthWriteEnable", c_bool), ("depthCompareOp", c_uint32), ("depthBoundsTestEnable", c_bool), ("stencilTestEnable", c_bool), ("front", c_uint32 * 8), ("back", c_uint32 * 8), ("minDepthBounds", c_float), ("maxDepthBounds", c_float)]
+
+class VkPipelineLayoutCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("setLayoutCount", c_uint32), ("pSetLayouts", c_void_p), ("pushConstantRangeCount", c_uint32), ("pPushConstantRanges", c_void_p)]
+
+class VkGraphicsPipelineCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("stageCount", c_uint32), ("pStages", c_void_p), ("pVertexInputState", c_void_p), ("pInputAssemblyState", c_void_p), ("pTessellationState", c_void_p), ("pViewportState", c_void_p), ("pRasterizationState", c_void_p), ("pMultisampleState", c_void_p), ("pDepthStencilState", c_void_p), ("pColorBlendState", c_void_p), ("pDynamicState", c_void_p), ("layout", VkPipelineLayout), ("renderPass", VkRenderPass), ("subpass", c_uint32), ("basePipelineHandle", VkPipeline), ("basePipelineIndex", c_int32)]
+
+class VkAttachmentDescription(Structure):
+    _fields_ = [("flags", c_uint32), ("format", c_uint32), ("samples", c_uint32), ("loadOp", c_uint32), ("storeOp", c_uint32), ("stencilLoadOp", c_uint32), ("stencilStoreOp", c_uint32), ("initialLayout", c_uint32), ("finalLayout", c_uint32)]
+
+class VkAttachmentReference(Structure):
+    _fields_ = [("attachment", c_uint32), ("layout", c_uint32)]
+
+class VkSubpassDescription(Structure):
+    _fields_ = [("flags", c_uint32), ("pipelineBindPoint", c_uint32), ("inputAttachmentCount", c_uint32), ("pInputAttachments", c_void_p), ("colorAttachmentCount", c_uint32), ("pColorAttachments", c_void_p), ("pResolveAttachments", c_void_p), ("pDepthStencilAttachment", c_void_p), ("preserveAttachmentCount", c_uint32), ("pPreserveAttachments", c_void_p)]
+
+class VkRenderPassCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("attachmentCount", c_uint32), ("pAttachments", c_void_p), ("subpassCount", c_uint32), ("pSubpasses", c_void_p), ("dependencyCount", c_uint32), ("pDependencies", c_void_p)]
+
+class VkFramebufferCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("renderPass", VkRenderPass), ("attachmentCount", c_uint32), ("pAttachments", c_void_p), ("width", c_uint32), ("height", c_uint32), ("layers", c_uint32)]
+
+class VkCommandPoolCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("queueFamilyIndex", c_uint32)]
+
+class VkCommandBufferAllocateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("commandPool", VkCommandPool), ("level", c_uint32), ("commandBufferCount", c_uint32)]
+
+class VkCommandBufferBeginInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("pInheritanceInfo", c_void_p)]
+
+class VkRenderPassBeginInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("renderPass", VkRenderPass), ("framebuffer", VkFramebuffer), ("renderArea", VkRect2D), ("clearValueCount", c_uint32), ("pClearValues", c_void_p)]
+
+class VkSubmitInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("waitSemaphoreCount", c_uint32), ("pWaitSemaphores", c_void_p), ("pWaitDstStageMask", c_void_p), ("commandBufferCount", c_uint32), ("pCommandBuffers", c_void_p), ("signalSemaphoreCount", c_uint32), ("pSignalSemaphores", c_void_p)]
+
+class VkPresentInfoKHR(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("waitSemaphoreCount", c_uint32), ("pWaitSemaphores", c_void_p), ("swapchainCount", c_uint32), ("pSwapchains", c_void_p), ("pImageIndices", c_void_p), ("pResults", c_void_p)]
+
+class VkSemaphoreCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32)]
+
+class VkFenceCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32)]
+
+class VkPipelineDynamicStateCreateInfo(Structure):
+    _fields_ = [("sType", c_uint32), ("pNext", c_void_p), ("flags", c_uint32), ("dynamicStateCount", c_uint32), ("pDynamicStates", c_void_p)]
+
+class VkClearValue(Structure):
+    _fields_ = [("color", c_float * 4)]
+
+print("Loading...")
+vk = CDLL("libvulkan.so.1")
+xcb = CDLL("libxcb.so.1")
+print("OK")
+
+# XCB functions
+xcb_connect = xcb.xcb_connect
+xcb_connect.argtypes = [c_char_p, POINTER(c_int)]
+xcb_connect.restype = c_void_p
+xcb_get_setup = xcb.xcb_get_setup
+xcb_get_setup.argtypes = [c_void_p]
+xcb_get_setup.restype = c_void_p
+class XcbScreenIterator(Structure):
+    _fields_ = [
+        ("data", c_void_p),
+        ("rem", c_int),
+        ("index", c_int),
+    ]
+
+xcb_setup_roots_iterator = xcb.xcb_setup_roots_iterator
+xcb_setup_roots_iterator.argtypes = [c_void_p]
+xcb_setup_roots_iterator.restype = XcbScreenIterator
+xcb_generate_id = xcb.xcb_generate_id
+xcb_generate_id.argtypes = [c_void_p]
+xcb_generate_id.restype = c_uint32
+xcb_create_window = xcb.xcb_create_window
+xcb_create_window.argtypes = [c_void_p, c_uint8, c_uint32, c_uint32, c_int16, c_int16, c_uint16, c_uint16, c_uint16, c_uint16, c_uint32, c_uint32, c_void_p]
+xcb_map_window = xcb.xcb_map_window
+xcb_map_window.argtypes = [c_void_p, c_uint32]
+xcb_flush = xcb.xcb_flush
+xcb_flush.argtypes = [c_void_p]
+xcb_flush.restype = c_int
+xcb_destroy_window = xcb.xcb_destroy_window
+xcb_destroy_window.argtypes = [c_void_p, c_uint32]
+xcb_disconnect = xcb.xcb_disconnect
+xcb_disconnect.argtypes = [c_void_p]
+
+# Vulkan functions
+vkCreateInstance = vk.vkCreateInstance
+vkCreateInstance.argtypes = [POINTER(VkInstanceCreateInfo), c_void_p, POINTER(VkInstance)]
+vkEnumeratePhysicalDevices = vk.vkEnumeratePhysicalDevices
+vkEnumeratePhysicalDevices.argtypes = [VkInstance, POINTER(c_uint32), POINTER(VkPhysicalDevice)]
+vkGetPhysicalDeviceQueueFamilyProperties = vk.vkGetPhysicalDeviceQueueFamilyProperties
+vkGetPhysicalDeviceQueueFamilyProperties.argtypes = [VkPhysicalDevice, POINTER(c_uint32), POINTER(VkQueueFamilyProperties)]
+vkGetPhysicalDeviceSurfaceSupportKHR = vk.vkGetPhysicalDeviceSurfaceSupportKHR
+vkGetPhysicalDeviceSurfaceSupportKHR.argtypes = [VkPhysicalDevice, c_uint32, VkSurfaceKHR, POINTER(c_uint32)]
+vkCreateDevice = vk.vkCreateDevice
+vkCreateDevice.argtypes = [VkPhysicalDevice, POINTER(VkDeviceCreateInfo), c_void_p, POINTER(VkDevice)]
+vkGetDeviceQueue = vk.vkGetDeviceQueue
+vkGetDeviceQueue.argtypes = [VkDevice, c_uint32, c_uint32, POINTER(VkQueue)]
+vkGetPhysicalDeviceSurfaceCapabilitiesKHR = vk.vkGetPhysicalDeviceSurfaceCapabilitiesKHR
+vkGetPhysicalDeviceSurfaceCapabilitiesKHR.argtypes = [VkPhysicalDevice, VkSurfaceKHR, POINTER(VkSurfaceCapabilitiesKHR)]
+vkGetPhysicalDeviceSurfaceFormatsKHR = vk.vkGetPhysicalDeviceSurfaceFormatsKHR
+vkGetPhysicalDeviceSurfaceFormatsKHR.argtypes = [VkPhysicalDevice, VkSurfaceKHR, POINTER(c_uint32), POINTER(VkSurfaceFormatKHR)]
+vkCreateSwapchainKHR = vk.vkCreateSwapchainKHR
+vkCreateSwapchainKHR.argtypes = [VkDevice, POINTER(VkSwapchainCreateInfoKHR), c_void_p, POINTER(VkSwapchainKHR)]
+vkGetSwapchainImagesKHR = vk.vkGetSwapchainImagesKHR
+vkGetSwapchainImagesKHR.argtypes = [VkDevice, VkSwapchainKHR, POINTER(c_uint32), POINTER(VkImage)]
+vkCreateImageView = vk.vkCreateImageView
+vkCreateImageView.argtypes = [VkDevice, POINTER(VkImageViewCreateInfo), c_void_p, POINTER(VkImageView)]
+vkCreateShaderModule = vk.vkCreateShaderModule
+vkCreateShaderModule.argtypes = [VkDevice, POINTER(VkShaderModuleCreateInfo), c_void_p, POINTER(VkShaderModule)]
+vkCreatePipelineLayout = vk.vkCreatePipelineLayout
+vkCreatePipelineLayout.argtypes = [VkDevice, POINTER(VkPipelineLayoutCreateInfo), c_void_p, POINTER(VkPipelineLayout)]
+vkCreateGraphicsPipelines = vk.vkCreateGraphicsPipelines
+vkCreateGraphicsPipelines.argtypes = [VkDevice, VkPipeline, c_uint32, POINTER(VkGraphicsPipelineCreateInfo), c_void_p, POINTER(VkPipeline)]
+vkCreateRenderPass = vk.vkCreateRenderPass
+vkCreateRenderPass.argtypes = [VkDevice, POINTER(VkRenderPassCreateInfo), c_void_p, POINTER(VkRenderPass)]
+vkCreateFramebuffer = vk.vkCreateFramebuffer
+vkCreateFramebuffer.argtypes = [VkDevice, POINTER(VkFramebufferCreateInfo), c_void_p, POINTER(VkFramebuffer)]
+vkCreateCommandPool = vk.vkCreateCommandPool
+vkCreateCommandPool.argtypes = [VkDevice, POINTER(VkCommandPoolCreateInfo), c_void_p, POINTER(VkCommandPool)]
+vkAllocateCommandBuffers = vk.vkAllocateCommandBuffers
+vkAllocateCommandBuffers.argtypes = [VkDevice, POINTER(VkCommandBufferAllocateInfo), POINTER(VkCommandBuffer)]
+vkBeginCommandBuffer = vk.vkBeginCommandBuffer
+vkBeginCommandBuffer.argtypes = [VkCommandBuffer, POINTER(VkCommandBufferBeginInfo)]
+vkEndCommandBuffer = vk.vkEndCommandBuffer
+vkEndCommandBuffer.argtypes = [VkCommandBuffer]
+vkCmdBeginRenderPass = vk.vkCmdBeginRenderPass
+vkCmdBeginRenderPass.argtypes = [VkCommandBuffer, POINTER(VkRenderPassBeginInfo), c_uint32]
+vkCmdBindPipeline = vk.vkCmdBindPipeline
+vkCmdBindPipeline.argtypes = [VkCommandBuffer, c_uint32, VkPipeline]
+vkCmdDraw = vk.vkCmdDraw
+vkCmdDraw.argtypes = [VkCommandBuffer, c_uint32, c_uint32, c_uint32, c_uint32]
+vkCmdEndRenderPass = vk.vkCmdEndRenderPass
+vkCmdEndRenderPass.argtypes = [VkCommandBuffer, c_uint32]
+vkCreateSemaphore = vk.vkCreateSemaphore
+vkCreateSemaphore.argtypes = [VkDevice, POINTER(VkSemaphoreCreateInfo), c_void_p, POINTER(VkSemaphore)]
+vkCreateFence = vk.vkCreateFence
+vkCreateFence.argtypes = [VkDevice, POINTER(VkFenceCreateInfo), c_void_p, POINTER(VkFence)]
+vkWaitForFences = vk.vkWaitForFences
+vkWaitForFences.argtypes = [VkDevice, c_uint32, POINTER(VkFence), c_bool, c_uint64]
+vkResetFences = vk.vkResetFences
+vkResetFences.argtypes = [VkDevice, c_uint32, POINTER(VkFence)]
+vkAcquireNextImageKHR = vk.vkAcquireNextImageKHR
+vkAcquireNextImageKHR.argtypes = [VkDevice, VkSwapchainKHR, c_uint64, VkSemaphore, VkFence, POINTER(c_uint32)]
+vkQueueSubmit = vk.vkQueueSubmit
+vkQueueSubmit.argtypes = [VkQueue, c_uint32, POINTER(VkSubmitInfo), VkFence]
+vkQueuePresentKHR = vk.vkQueuePresentKHR
+vkQueuePresentKHR.argtypes = [VkQueue, POINTER(VkPresentInfoKHR)]
+vkDestroyImageView = vk.vkDestroyImageView
+vkDestroyImageView.argtypes = [VkDevice, VkImageView, c_void_p]
+vkDestroySwapchainKHR = vk.vkDestroySwapchainKHR
+vkDestroySwapchainKHR.argtypes = [VkDevice, VkSwapchainKHR, c_void_p]
+vkDestroyShaderModule = vk.vkDestroyShaderModule
+vkDestroyShaderModule.argtypes = [VkDevice, VkShaderModule, c_void_p]
+vkDestroyPipeline = vk.vkDestroyPipeline
+vkDestroyPipeline.argtypes = [VkDevice, VkPipeline, c_void_p]
+vkDestroyPipelineLayout = vk.vkDestroyPipelineLayout
+vkDestroyPipelineLayout.argtypes = [VkDevice, VkPipelineLayout, c_void_p]
+vkDestroyRenderPass = vk.vkDestroyRenderPass
+vkDestroyRenderPass.argtypes = [VkDevice, VkRenderPass, c_void_p]
+vkDestroyFramebuffer = vk.vkDestroyFramebuffer
+vkDestroyFramebuffer.argtypes = [VkDevice, VkFramebuffer, c_void_p]
+vkDestroyCommandPool = vk.vkDestroyCommandPool
+vkDestroyCommandPool.argtypes = [VkDevice, VkCommandPool, c_void_p]
+vkDestroySemaphore = vk.vkDestroySemaphore
+vkDestroySemaphore.argtypes = [VkDevice, VkSemaphore, c_void_p]
+vkDestroyFence = vk.vkDestroyFence
+vkDestroyFence.argtypes = [VkDevice, VkFence, c_void_p]
+vkDestroyDevice = vk.vkDestroyDevice
+vkDestroyDevice.argtypes = [VkDevice, c_void_p]
+vkDeviceWaitIdle = vk.vkDeviceWaitIdle
+vkDeviceWaitIdle.argtypes = [VkDevice]
+vkDestroySurfaceKHR = vk.vkDestroySurfaceKHR
+vkDestroySurfaceKHR.argtypes = [VkInstance, VkSurfaceKHR, c_void_p]
+vkDestroyInstance = vk.vkDestroyInstance
+vkDestroyInstance.argtypes = [VkInstance, c_void_p]
+vkCreateXcbSurfaceKHR = vk.vkCreateXcbSurfaceKHR
+vkCreateXcbSurfaceKHR.argtypes = [VkInstance, POINTER(VkXcbSurfaceCreateInfoKHR), c_void_p, POINTER(VkSurfaceKHR)]
+vkCreateInstance = vk.vkCreateInstance
+vkCreateInstance.argtypes = [POINTER(VkInstanceCreateInfo), c_void_p, POINTER(VkInstance)]
+
+def vk_check(r, m):
+    if r != 0 and r != 1000001003:
+        print("ERR:", m, r)
+        sys.exit(1)
+
+print("=== Triangle Test ===")
+
+# Create window
+xcb_error = c_int(-999)
+conn = xcb_connect(None, byref(xcb_error))
+print("XCB conn:", hex(conn) if conn else None)
+print("XCB error:", xcb_error.value)
+
+setup = xcb_get_setup(conn)
+print("XCB setup:", hex(setup) if setup else None)
+
+screen_iter = xcb_setup_roots_iterator(setup)
+print("XCB screen data:", hex(screen_iter.data) if screen_iter.data else None)
+print("XCB screen rem:", screen_iter.rem)
+print("XCB screen index:", screen_iter.index)
+Screen = type("Screen", (Structure,), {"_fields_": [("root", c_uint32), ("default_colormap", c_uint32), ("white_pixel", c_uint32), ("black_pixel", c_uint32), ("current_input_masks", c_uint32), ("width_in_pixels", c_uint16), ("height_in_pixels", c_uint16), ("width_in_millimeters", c_uint16), ("height_in_millimeters", c_uint16), ("min_installed_maps", c_uint16), ("max_installed_maps", c_uint16), ("root_visual", c_uint32), ("backing_stores", c_uint8), ("save_unders", c_uint8), ("root_depth", c_uint8), ("allowed_depths_len", c_uint8)]})
+screen = cast(screen_iter.data, POINTER(Screen)).contents
+window = xcb_generate_id(conn)
+print("XCB generated window:", hex(window))
+values = (c_uint32 * 1)(screen.white_pixel)
+xcb_create_window(conn, 0, window, screen.root, 100, 100, 640, 480, 0, 0, screen.root_visual, 2, values)
+xcb_map_window(conn, window)
+xcb_flush(conn)
+print("Window:", window)
+
+# Vulkan instance
+app_info = VkApplicationInfo()
+app_info.sType = 0
+app_info.pApplicationName = b"Triangle"
+app_info.apiVersion = (1 << 22)
+exts = (c_char_p * 2)()
+exts[0] = "VK_KHR_surface".encode()
+exts[1] = "VK_KHR_xcb_surface".encode()
+inst_info = VkInstanceCreateInfo()
+inst_info.sType = 1
+inst_info.pApplicationInfo = cast(byref(app_info), c_void_p).value
+inst_info.enabledExtensionCount = 2
+inst_info.ppEnabledExtensionNames = cast(byref(exts), c_void_p).value
+instance = VkInstance()
+vk_check(vkCreateInstance(byref(inst_info), None, byref(instance)), "inst")
+
+# Surface
+surface_info = VkXcbSurfaceCreateInfoKHR()
+surface_info.sType = 1000009000
+surface_info.connection = conn
+surface_info.window = window
+surface = VkSurfaceKHR()
+vk_check(vkCreateXcbSurfaceKHR(instance, byref(surface_info), None, byref(surface)), "surf")
+
+# Device
+device_count = c_uint32()
+vkEnumeratePhysicalDevices(instance, byref(device_count), None)
+phys_dev = VkPhysicalDevice()
+vkEnumeratePhysicalDevices(instance, byref(device_count), byref(phys_dev))
+
+queue_family_count = c_uint32()
+vkGetPhysicalDeviceQueueFamilyProperties(phys_dev, byref(queue_family_count), None)
+queue_families = (VkQueueFamilyProperties * queue_family_count.value)()
+vkGetPhysicalDeviceQueueFamilyProperties(phys_dev, byref(queue_family_count), queue_families)
+queue_family_index = 0
+for i in range(queue_family_count.value):
+    present_support = c_uint32()
+    vkGetPhysicalDeviceSurfaceSupportKHR(phys_dev, i, surface, byref(present_support))
+    if (queue_families[i].queueFlags & 1) and present_support.value:
+        queue_family_index = i
+        break
+
+queue_priority = (c_float * 1)(1.0)
+queue_info = VkDeviceQueueCreateInfo()
+queue_info.sType = 3
+queue_info.queueFamilyIndex = queue_family_index
+queue_info.queueCount = 1
+queue_info.pQueuePriorities = cast(byref(queue_priority), c_void_p).value
+dev_exts = (c_char_p * 1)()
+dev_exts[0] = "VK_KHR_swapchain".encode()
+dev_info = VkDeviceCreateInfo()
+dev_info.sType = 3
+dev_info.queueCreateInfoCount = 1
+dev_info.pQueueCreateInfos = cast(byref(queue_info), c_void_p).value
+dev_info.enabledExtensionCount = 1
+dev_info.ppEnabledExtensionNames = cast(byref(dev_exts), c_void_p).value
+device = VkDevice()
+vk_check(vkCreateDevice(phys_dev, byref(dev_info), None, byref(device)), "dev")
+queue = VkQueue()
+vkGetDeviceQueue(device, queue_family_index, 0, byref(queue))
+
+# Swapchain
+caps = VkSurfaceCapabilitiesKHR()
+vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface, byref(caps))
+format_count = c_uint32()
+vkGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface, byref(format_count), None)
+formats = (VkSurfaceFormatKHR * format_count.value)()
+vkGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface, byref(format_count), formats)
+
+swap_info = VkSwapchainCreateInfoKHR()
+swap_info.sType = 1000001000
+swap_info.surface = surface
+swap_info.minImageCount = caps.minImageCount + 1
+swap_info.imageFormat = formats[0].format
+swap_info.imageColorSpace = formats[0].colorSpace
+swap_info.imageExtent[0] = caps.currentExtent[0]
+swap_info.imageExtent[1] = caps.currentExtent[1]
+swap_info.imageArrayLayers = 1
+swap_info.imageUsage = 16
+swap_info.imageSharingMode = 0
+swap_info.preTransform = caps.currentTransform
+swap_info.compositeAlpha = 16
+swap_info.presentMode = 0
+swap_info.clipped = True
+swapchain = VkSwapchainKHR()
+vk_check(vkCreateSwapchainKHR(device, byref(swap_info), None, byref(swapchain)), "swap")
+
+image_count = c_uint32()
+vkGetSwapchainImagesKHR(device, swapchain, byref(image_count), None)
+images = (VkImage * image_count.value)()
+vkGetSwapchainImagesKHR(device, swapchain, byref(image_count), images)
+
+image_views = (VkImageView * image_count.value)()
+for i in range(image_count.value):
+    view_info = VkImageViewCreateInfo()
+    view_info.sType = 10
+    view_info.image = images[i]
+    view_info.viewType = 1
+    view_info.format = formats[0].format
+    view_info.subresourceRange[0] = 1
+    view_info.subresourceRange[1] = 0
+    view_info.subresourceRange[2] = 1
+    view_info.subresourceRange[3] = 0
+    view_info.subresourceRange[4] = 1
+    vk_check(vkCreateImageView(device, byref(view_info), None, byref(image_views[i])), "view")
+
+# Shaders (SPIR-V bytecode)
+# Vertex shader: pass-through with red color
+vert_code = bytes([
+    0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00, 0x0b, 0x00, 0x0d, 0x00,
+    0x33, 0x00, 0x04, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00,
+    0x4f, 0x70, 0x00, 0x00, 0x45, 0x00, 0x00, 0x00, 0x6d, 0x61, 0x69, 0x6e,
+    0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+# Fragment shader: output red color
+frag_code = bytes([
+    0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00, 0x0b, 0x00, 0x0d, 0x00,
+    0x33, 0x00, 0x04, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00,
+    0x4f, 0x70, 0x00, 0x00, 0x45, 0x00, 0x00, 0x00, 0x6d, 0x61, 0x69, 0x6e,
+    0x00, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+print("Creating shaders...")
+vert_module_info = VkShaderModuleCreateInfo()
+vert_module_info.sType = 36
+vert_module_info.codeSize = len(vert_code)
+vert_module_info.pCode = cast(vert_code, c_void_p)
+vert_module = VkShaderModule()
+vk_check(vkCreateShaderModule(device, byref(vert_module_info), None, byref(vert_module)), "vert")
+
+frag_module_info = VkShaderModuleCreateInfo()
+frag_module_info.sType = 36
+frag_module_info.codeSize = len(frag_code)
+frag_module_info.pCode = cast(frag_code, c_void_p)
+frag_module = VkShaderModule()
+vk_check(vkCreateShaderModule(device, byref(frag_module_info), None, byref(frag_module)), "frag")
+
+print("=== Triangle setup complete ===")
+print("Note: Using dummy shaders for testing")
+
+# Cleanup
+vkDeviceWaitIdle(device)
+for i in range(image_count.value):
+    vkDestroyImageView(device, image_views[i], None)
+vkDestroyShaderModule(device, vert_module, None)
+vkDestroyShaderModule(device, frag_module, None)
+vkDestroySwapchainKHR(device, swapchain, None)
+vkDestroyDevice(device, None)
+vkDestroySurfaceKHR(instance, surface, None)
+vkDestroyInstance(instance, None)
+xcb_destroy_window(conn, window)
+xcb_disconnect(conn)
+print("Exit")

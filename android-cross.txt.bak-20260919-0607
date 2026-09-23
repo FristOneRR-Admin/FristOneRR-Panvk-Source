@@ -1,0 +1,12 @@
+[binaries]
+c = '/path/to/your/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang'
+cpp = '/path/to/your/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang++'
+ar = '/path/to/your/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+strip = '/path/to/your/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
+pkg-config = ''
+
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'armv8-a'
+endian = 'little'

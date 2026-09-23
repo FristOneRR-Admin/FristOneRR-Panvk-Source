@@ -9,6 +9,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../../lib/pan_trace_gate.h"
 #include "genxml/gen_macros.h"
 
 #include "decode.h"
@@ -47,7 +48,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    struct panvk_physical_device *phys_dev =
       to_panvk_physical_device(dev->vk.physical);
    uint64_t vtc_atom = 0, frag_atom = 0;
-   fprintf(stderr, "[TRACE] submit_batch: vtc_jc.first_job=%lu frag_jc.first_job=%lu\n", (unsigned long)batch->vtc_jc.first_job, (unsigned long)batch->frag_jc.first_job); fflush(stderr);
+   PANVK_TRACE_PRINTF( "[TRACE] submit_batch: vtc_jc.first_job=%lu frag_jc.first_job=%lu\n", (unsigned long)batch->vtc_jc.first_job, (unsigned long)batch->frag_jc.first_job); fflush(stderr);
 
    /* Reset the batch if it's already been issued */
    if (batch->issued) {
@@ -75,10 +76,19 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
 
    if (batch->vtc_jc.first_job) {
-      vtc_atom = kbase_kmod_job_submit(
-         dev->kmod.dev, batch->vtc_jc.first_job, BASE_JD_REQ_ONLY_COMPUTE,
+         if (unlikely(!queue->warmed_up)) {
+         uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+            fprintf(stderr, "[JC-DUMP] vtc_jc before first submit, core_req=0x%x, has_frag=%d\n", vtc_core_req, batch->frag_jc.first_job != 0);
+            fflush(stderr);
+            fprintf(stderr, "[JC-DUMP] skip blocking warm-up, use normal submit\n");
+            fflush(stderr);
+            queue->warmed_up = true;
+         } else {
+         uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+            vtc_atom = kbase_kmod_job_submit(
+         dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req,
          bos, nr_bos, NULL, 0);
-      assert(vtc_atom);
+            assert(vtc_atom);
 
       if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
          ASSERTED bool done =
@@ -93,8 +103,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
       }
 
       if (PANVK_DEBUG(TRACE)) {
-         pandecode_jc(dev->debug.decode_ctx, batch->vtc_jc.first_job,
-                      phys_dev->kmod.dev->props.gpu_id);
+         /* skip pandecode_jc */
       }
 
       if (PANVK_DEBUG(DUMP))
@@ -103,45 +112,55 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
       if (PANVK_DEBUG(SYNC))
          pandecode_abort_on_fault(dev->debug.decode_ctx, batch->vtc_jc.first_job,
                                   phys_dev->kmod.dev->props.gpu_id);
-   }
+   
+         } /* end !warmed_up else */
+      }
 
    if (batch->frag_jc.first_job) {
       /* The fragment job depends on the vertex/tiler job. kbase atoms can't
        * express that dependency for us, so block on the CPU here before
        * submitting the fragment job. */
       if (vtc_atom) {
-         ASSERTED bool done = kbase_kmod_wait_atom(dev->kmod.dev, vtc_atom, -1);
-         assert(done);
+         bool done = kbase_kmod_wait_atom(dev->kmod.dev, vtc_atom, 16000000);
+         fprintf(stderr,
+                 "[FONTATLAS10.3] vtc-before-frag wait atom=%lu done=%d\n",
+                 (unsigned long)vtc_atom, (int)done);
+         fflush(stderr);
+
+         if (!done) {
+            fprintf(stderr,
+                    "[FONTATLAS10.3] WARNING: vtc wait timeout before frag\n");
+            fflush(stderr);
+         }
       }
 
-      frag_atom = kbase_kmod_job_submit(dev->kmod.dev,
-                                        batch->frag_jc.first_job,
-                                        BASE_JD_REQ_FS, bos, nr_bos, NULL, 0);
-      assert(frag_atom);
-
-      if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
-         ASSERTED bool done =
-            kbase_kmod_wait_atom(dev->kmod.dev, frag_atom, -1);
-         assert(done);
-            frag_atom = 0; /* already waited+consumed above; don't wait again in wait_one() */
-
-         panvk_pool_invalidate_maps(&cmdbuf->desc_pool);
-         pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+      if (unlikely(!queue->frag_warmed_up)) {
+         fprintf(stderr, "[FONTATLAS10.3] frag warm-up retry\n");
+         fflush(stderr);
+         bool ok = kbase_kmod_job_submit_retry(
+            dev->kmod.dev, batch->frag_jc.first_job, BASE_JD_REQ_FS,
+            bos, nr_bos, NULL, 0, 5);
+         queue->frag_warmed_up = true;
+         fprintf(stderr, "[FONTATLAS10.3] frag warm-up ok=%d\n", (int)ok);
+         fflush(stderr);
+         frag_atom = 0;
+      } else {
+         frag_atom = kbase_kmod_job_submit(dev->kmod.dev,
+                                            batch->frag_jc.first_job,
+                                            BASE_JD_REQ_FS, bos, nr_bos, NULL, 0);
+         assert(frag_atom);
       }
 
-      fprintf(stderr, "[PANDECODE-CHECK] frag reached, decode_ctx=%p debug=0x%llx first_job=0x%llx\n",
+      PANVK_TRACE_PRINTF( "[PANDECODE-CHECK] frag reached, decode_ctx=%p debug=0x%llx first_job=0x%llx\n",
               (void*)dev->debug.decode_ctx, (unsigned long long)panvk_debug,
               (unsigned long long)batch->frag_jc.first_job);
       if (PANVK_DEBUG(TRACE))
-         pandecode_jc(dev->debug.decode_ctx, batch->frag_jc.first_job,
-                      phys_dev->kmod.dev->props.gpu_id);
+         /* skip pandecode_jc */
 
       if (PANVK_DEBUG(DUMP))
          pandecode_dump_mappings(dev->debug.decode_ctx);
 
-      if (PANVK_DEBUG(SYNC))
-         pandecode_abort_on_fault(dev->debug.decode_ctx, batch->frag_jc.first_job,
-                                  phys_dev->kmod.dev->props.gpu_id);
+      /* tex4: do not pandecode fragment before wait */
    }
 
    if (PANVK_DEBUG(TRACE))
@@ -212,7 +231,16 @@ panvk_jm_kbase_wait_atoms(void *data, const uint64_t targets[PANVK_KBASE_SYNC_TA
       if (!targets[i])
          continue;
       if (!kbase_kmod_wait_atom(kmod_dev, targets[i], timeout_ns))
-         return timeout_ns == 0 ? VK_TIMEOUT : VK_ERROR_DEVICE_LOST;
+         {
+         if (abs_timeout_ns != UINT64_MAX) {
+            struct timespec now2;
+            clock_gettime(CLOCK_MONOTONIC_RAW, &now2);
+            int64_t now2_ns = (int64_t)now2.tv_sec * 1000000000ll + now2.tv_nsec;
+            if (now2_ns >= (int64_t)abs_timeout_ns)
+               return VK_TIMEOUT;
+         }
+         return VK_ERROR_DEVICE_LOST;
+      }
    }
 
    return VK_SUCCESS;
@@ -226,6 +254,28 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
 
    uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
    unsigned ntargets = 0;
+
+   if (submit->wait_count) {
+      PANVK_TRACE_PRINTF(
+         "[FONTATLAS10.3] JM incoming waits=%u: CPU wait begin\\n",
+         submit->wait_count);
+      fflush(stderr);
+
+      VkResult result =
+         vk_sync_wait_many(&dev->vk,
+                           submit->wait_count,
+                           submit->waits,
+                           VK_SYNC_WAIT_COMPLETE,
+                           UINT64_MAX);
+
+      PANVK_TRACE_PRINTF(
+         "[FONTATLAS10.3] JM incoming waits=%u: CPU wait result=%d\\n",
+         submit->wait_count, result);
+      fflush(stderr);
+
+      if (result != VK_SUCCESS)
+         return result;
+   }
 
    for (uint32_t j = 0; j < submit->command_buffer_count; ++j) {
       struct panvk_cmd_buffer *cmdbuf =

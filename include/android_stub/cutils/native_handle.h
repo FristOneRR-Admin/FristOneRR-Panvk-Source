@@ -123,3 +123,10 @@ int native_handle_delete(native_handle_t* h);
 #endif
 
 #endif /* NATIVE_HANDLE_H_ */
+
+
+#ifndef BUFFER_HANDLE_T_FORCED
+#define BUFFER_HANDLE_T_FORCED
+typedef const struct native_handle* buffer_handle_t;
+#endif
+

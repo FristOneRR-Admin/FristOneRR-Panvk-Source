@@ -20,7 +20,7 @@
 #if defined(__ANDROID__) || defined(ANDROID)
 
 #include <cutils/native_handle.h>
-#if ANDROID_API_LEVEL < 28
+#if 1
 /* buffer_handle_t was defined in the deprecated system/window.h */
 typedef const native_handle_t *buffer_handle_t;
 #endif

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "../lib/pan_trace_gate.h"
 #include "panvk_buffer.h"
 #include "panvk_cmd_meta.h"
 #include "panvk_entrypoints.h"
@@ -21,16 +22,17 @@
 static bool
 copy_to_image_use_gfx_pipeline(struct panvk_image *dst_img)
 {
-   /* Don't force gfx-based copies if the format is bigger than 32-bit. */
-   if (PANVK_DEBUG(COPY_GFX) &&
-       vk_format_get_blocksize(dst_img->vk.format) <= 4)
-      return true;
+   bool afbc = drm_is_afbc(dst_img->vk.drm_format_mod);
+   bool gfx_forced = PANVK_DEBUG(COPY_GFX) &&
+                      vk_format_get_blocksize(dst_img->vk.format) <= 4;
+   bool result = gfx_forced || afbc;
 
-   /* Writes to AFBC images must go through the graphics pipeline. */
-   if (drm_is_afbc(dst_img->vk.drm_format_mod))
-      return true;
+   PANVK_TRACE_PRINTF( "[COPYDEBUG] use_gfx_pipeline=%d afbc=%d mod=0x%llx format=%d blocksize=%u\n",
+           result, afbc, (unsigned long long)dst_img->vk.drm_format_mod,
+           dst_img->vk.format, vk_format_get_blocksize(dst_img->vk.format));
+   fflush(stderr);
 
-   return false;
+   return result;
 }
 
 static void

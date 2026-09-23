@@ -83,13 +83,18 @@ else
   endif
 endif
 
-has_spirv_link_workaround = cpp.has_member(
-  'spvtools::LinkerOptions',
-  'SetAllowPtrTypeMismatch(true)',
-  prefix : [
-    '#include <spirv-tools/linker.hpp>',
-  ],
+has_spirv_link_workaround = cpp.compiles(
+  '''
+  #include <spirv-tools/linker.hpp>
+
+  int main() {
+    spvtools::LinkerOptions options;
+    options.SetAllowPtrTypeMismatch(true);
+    return 0;
+  }
+  ''',
   dependencies : dep_spirv_tools,
+  args : ['-Wno-error=unguarded-availability', '-Wno-error=unguarded-availability-new'],
 )
 if dep_llvm.version().version_compare('>= 17.0') and not has_spirv_link_workaround
   error('SPIRV-Tools doesn\'t contain https://github.com/KhronosGroup/SPIRV-Tools/pull/5534\n')

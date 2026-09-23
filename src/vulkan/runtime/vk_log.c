@@ -21,6 +21,9 @@
  * IN THE SOFTWARE.
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include "vk_log.h"
 #include "vk_debug_utils.h"
 #include "vk_debug_report.h"
@@ -370,6 +373,15 @@ __vk_errorf(const void *_obj, VkResult error,
             const char *file, int line,
             const char *format, ...)
 {
+   if (error == VK_ERROR_FEATURE_NOT_PRESENT || (error != VK_SUCCESS && getenv("PANVK_LOG_ERRORS") != NULL)) {
+      va_list _vkerr_va;
+      va_start(_vkerr_va, format);
+      fprintf(stderr, "[VKERR] result=%d %s:%d: ", (int)error, file, line);
+      vfprintf(stderr, format, _vkerr_va);
+      fprintf(stderr, "\n");
+      va_end(_vkerr_va);
+   }
+
    va_list va;
 
    va_start(va, format);

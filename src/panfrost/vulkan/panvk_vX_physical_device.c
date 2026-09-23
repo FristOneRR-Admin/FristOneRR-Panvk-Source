@@ -9,6 +9,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdlib.h>
+#define PANVK_DXVK_COMPAT_ON() (getenv("PANVK_DXVK_COMPAT") != NULL && getenv("PANVK_DXVK_COMPAT")[0] == '1')
 #include <sys/sysmacros.h>
 
 #include "git_sha1.h"
@@ -40,6 +42,9 @@ panvk_per_arch(get_physical_device_extensions)(
    struct vk_device_extension_table *ext)
 {
    bool has_gralloc = vk_android_get_ugralloc() != NULL;
+   fprintf(stderr, "[FristOneRR1] has_gralloc=%d ugralloc=%p\n",
+           (int)has_gralloc, (void*)vk_android_get_ugralloc());
+   fflush(stderr);
 
    *ext = (struct vk_device_extension_table){
       .KHR_8bit_storage = true,
@@ -305,7 +310,7 @@ panvk_per_arch(get_physical_device_features)(
       .fullDrawIndexUint32 = true,
       .imageCubeArray = true,
       .independentBlend = true,
-      .geometryShader = false,
+      .geometryShader = PANVK_DXVK_COMPAT_ON(),
       .tessellationShader = PAN_ARCH >= 10,
       .sampleRateShading = true,
       .dualSrcBlend = true,
@@ -326,11 +331,11 @@ panvk_per_arch(get_physical_device_features)(
       .wideLines = true,
       .largePoints = true,
       .alphaToOne = false,
-      .multiViewport = false,
+      .multiViewport = PANVK_DXVK_COMPAT_ON(),
       .samplerAnisotropy = true,
       .textureCompressionETC2 = has_texture_compression_etc2(device),
       .textureCompressionASTC_LDR = has_texture_compression_astc_ldr(device),
-      .textureCompressionBC = has_texture_compression_bc(device),
+      .textureCompressionBC = has_texture_compression_bc(device) || PANVK_DXVK_COMPAT_ON(),
       .occlusionQueryPrecise = true,
       .pipelineStatisticsQuery = false,
       /* On v13+, the hardware isn't speculatively referencing to invalid
@@ -349,8 +354,8 @@ panvk_per_arch(get_physical_device_features)(
       .shaderSampledImageArrayDynamicIndexing = true,
       .shaderStorageBufferArrayDynamicIndexing = true,
       .shaderStorageImageArrayDynamicIndexing = true,
-      .shaderClipDistance = false,
-      .shaderCullDistance = false,
+      .shaderClipDistance = PANVK_DXVK_COMPAT_ON(),
+      .shaderCullDistance = PANVK_DXVK_COMPAT_ON(),
       .shaderFloat64 = false,
       .shaderInt64 = true,
       .shaderInt16 = true,

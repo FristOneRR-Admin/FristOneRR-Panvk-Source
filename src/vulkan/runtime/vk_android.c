@@ -172,6 +172,12 @@ vk_gralloc_to_drm_explicit_layout(
    out->pPlaneLayouts = out_layouts;
 
    out->drmFormatModifier = info.modifier;
+   if (out->drmFormatModifier == (uint64_t)DRM_FORMAT_MOD_INVALID) {
+      fprintf(stderr, "[FristOneRR1] modifier invalid fourcc=0x%x planes=%d -> LINEAR\n",
+              info.drm_fourcc, info.num_planes);
+      fflush(stderr);
+      out->drmFormatModifier = DRM_FORMAT_MOD_LINEAR;
+   }
    out->drmFormatModifierPlaneCount = info.num_planes;
    for (size_t i = 0; i < info.num_planes; i++) {
       out_layouts[i].offset = info.offsets[i];
@@ -884,6 +890,9 @@ get_ahb_buffer_format_properties2(
    /* "Buffer must be a valid Android hardware buffer object with at least
     * one of the AHARDWAREBUFFER_USAGE_GPU_* usage flags."
     */
+   fprintf(stderr, "[FristOneRR1] props usage=0x%llx format=%d layers=%u gpu_usage=%d\n",
+           (unsigned long long)desc.usage, desc.format, desc.layers, (int)gpu_usage);
+   fflush(stderr);
    if (!gpu_usage)
       return VK_ERROR_INVALID_EXTERNAL_HANDLE;
 
@@ -1088,14 +1097,34 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
 
    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
    assert(handle && handle->numFds > 0);
-   pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
+   int use_fd = handle->data[0];
+   off_t use_sz = -1;
+   for (int i = 0; i < handle->numFds; i++) {
+      off_t sz = lseek(handle->data[i], 0, SEEK_END);
+      fprintf(stderr, "[FristOneRR1] fd[%d]=%d seek=%lld\n",
+              i, handle->data[i], (long long)sz);
+      fflush(stderr);
+      if (sz > 0 && use_sz < 0) {
+         use_fd = handle->data[i];
+         use_sz = sz;
+         lseek(use_fd, 0, SEEK_SET);
+      }
+   }
+   pProperties->allocationSize = use_sz > 0 ? (uint64_t)use_sz : 0;
+   fprintf(stderr, "[FristOneRR1] fd numFds=%d fd0=%d seek=%llu\n",
+           handle->numFds, handle->data[0],
+           (unsigned long long)pProperties->allocationSize);
+   fflush(stderr);
 
    VkMemoryFdPropertiesKHR fd_props = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
    };
    result = device->dispatch_table.GetMemoryFdPropertiesKHR(
-      device_h, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, handle->data[0],
+      device_h, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, use_fd,
       &fd_props);
+   fprintf(stderr, "[FristOneRR1] GetMemoryFdPropertiesKHR result=0x%x bits=0x%x\n",
+           result, fd_props.memoryTypeBits);
+   fflush(stderr);
    if (result != VK_SUCCESS)
       return result;
 
