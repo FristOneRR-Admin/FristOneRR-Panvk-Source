@@ -54,6 +54,13 @@
 
 #include "genxml/gen_macros.h"
 
+/* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+#include <stdio.h>
+#include <stdlib.h>
+static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+/* ---- end gate ---- */
+
 #define PER_ARCH_FUNCS(_ver)                                                   \
    void panvk_v##_ver##_get_physical_device_extensions(                        \
       const struct panvk_physical_device *device,                              \
@@ -693,6 +700,7 @@ kbase_cpu_sync_signal(UNUSED struct vk_device *device, struct vk_sync *sync,
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
    mtx_lock(&ks->mutex);
    ks->state = KBASE_CPU_SYNC_SIGNALED;
+   fprintf(stderr, "[P3] %s ks=%p -> SIGNALED tid=%ld\n", __func__, (void *)ks, (long)gettid()); fflush(stderr);
    ks->result = VK_SUCCESS;
    ks->pending_data = NULL;
    ks->pending_wait = NULL;
@@ -713,6 +721,7 @@ kbase_cpu_sync_reset(UNUSED struct vk_device *device, struct vk_sync *sync)
       u_cnd_monotonic_wait(&ks->cond, &ks->mutex);
    }
    ks->state = KBASE_CPU_SYNC_RESET;
+   fprintf(stderr, "[P3] %s ks=%p -> RESET tid=%ld\n", __func__, (void *)ks, (long)gettid()); fflush(stderr);
    ks->result = VK_SUCCESS;
    ks->pending_data = NULL;
    ks->pending_wait = NULL;
@@ -748,6 +757,7 @@ panvk_kbase_sync_set_pending(
    memcpy(ks->targets, targets, sizeof(ks->targets));
    ks->result = VK_SUCCESS;
    ks->state = KBASE_CPU_SYNC_PENDING;
+   fprintf(stderr, "[P3] %s ks=%p -> PENDING t0=%lu tid=%ld\n", __func__, (void *)ks, (unsigned long)ks->targets[0], (long)gettid()); fflush(stderr);
    PANVK_TRACE_PRINTF( "[TRACE] set_pending: targets[0]=%lu targets[1]=%lu targets[2]=%lu\n", (unsigned long)ks->targets[0], (unsigned long)ks->targets[1], (unsigned long)ks->targets[2]); fflush(stderr);
    u_cnd_monotonic_broadcast(&ks->cond);
    mtx_unlock(&ks->mutex);
@@ -795,12 +805,15 @@ kbase_cpu_sync_wait_one_impl(struct vk_device *device, struct kbase_cpu_sync *ks
          mtx_lock(&ks->mutex);
          if (result == VK_SUCCESS) {
             ks->state = KBASE_CPU_SYNC_SIGNALED;
+            fprintf(stderr, "[P3] %s ks=%p -> SIGNALED tid=%ld\n", __func__, (void *)ks, (long)gettid()); fflush(stderr);
             ks->pending_data = NULL;
             ks->pending_wait = NULL;
          } else if (result == VK_TIMEOUT) {
             ks->state = KBASE_CPU_SYNC_PENDING;
+            fprintf(stderr, "[P3] %s ks=%p -> PENDING t0=%lu tid=%ld\n", __func__, (void *)ks, (unsigned long)ks->targets[0], (long)gettid()); fflush(stderr);
          } else {
             ks->state = KBASE_CPU_SYNC_FAILED;
+            fprintf(stderr, "[P3] %s ks=%p -> FAILED tid=%ld\n", __func__, (void *)ks, (long)gettid()); fflush(stderr);
             ks->result = result;
          }
          u_cnd_monotonic_broadcast(&ks->cond);

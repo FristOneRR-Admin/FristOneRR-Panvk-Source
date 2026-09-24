@@ -25,6 +25,12 @@ struct panvk_gpu_queue {
    bool warmed_up;
    bool frag_warmed_up;
    struct vk_sync *sync;
+   /* Last atom submitted on this queue; submits without GPU work must still
+    * signal only after all previously submitted work has completed. */
+   uint64_t last_submitted_atom;
+   /* Previous fragment atom: the tiler heap is shared, so a new tiler job must
+    * not start until the previous fragment job has consumed the heap. */
+   uint64_t last_frag_atom;
 };
 
 VK_DEFINE_HANDLE_CASTS(panvk_gpu_queue, vk.base, VkQueue, VK_OBJECT_TYPE_QUEUE)

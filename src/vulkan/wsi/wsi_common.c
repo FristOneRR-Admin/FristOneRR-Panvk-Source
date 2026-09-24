@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <sys/prctl.h>
 #include <string.h>
 #include <stdlib.h>
 #include "wsi_common_private.h"
@@ -50,6 +51,13 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+
+/* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+#include <stdio.h>
+#include <stdlib.h>
+static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+/* ---- end gate ---- */
 #endif
 
 uint64_t WSI_DEBUG;
@@ -2277,6 +2285,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
                                const VkAcquireNextImageInfoKHR *pAcquireInfo,
                                uint32_t *pImageIndex)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "wsi_common_acquire_next_image2", (long)gettid(), _n); fflush(stderr); }
    fprintf(stderr, "[ACQ] enter wsi_common_acquire_next_image2\n");
    VK_FROM_HANDLE(wsi_swapchain, swapchain, pAcquireInfo->swapchain);
    VK_FROM_HANDLE(vk_device, device, _device);
@@ -2448,6 +2457,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
                          struct vk_queue *queue,
                          const VkPresentInfoKHR *pPresentInfo)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "wsi_common_queue_present", (long)gettid(), _n); fflush(stderr); }
    struct vk_device *dev = queue->base.device;
    uint32_t current_frame = p_atomic_fetch_add(&dev->current_frame, 1);
    VkResult final_result = handle_trace(queue, dev, current_frame);

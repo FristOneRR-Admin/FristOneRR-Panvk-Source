@@ -42,6 +42,23 @@
 #include "vk_sync_timeline.h"
 #include "vk_util.h"
 
+/* ---- P2 trace ---- */
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
+/* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+#include <stdio.h>
+#include <stdlib.h>
+static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+/* ---- end gate ---- */
+struct p2s { const char *n; long long t; };
+static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
+#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
+/* ---- end P2 ---- */
+
 static VkResult
 vk_queue_start_submit_thread(struct vk_queue *queue);
 
@@ -1280,6 +1297,7 @@ vk_common_QueueSubmit2(VkQueue _queue,
                           const VkSubmitInfo2 *pSubmits,
                           VkFence _fence)
 {
+   P2_SCOPE("vk_common_QueueSubmit2");
    VK_FROM_HANDLE(vk_queue, queue, _queue);
    VK_FROM_HANDLE(vk_fence, fence, _fence);
    VkResult result;
@@ -1464,6 +1482,7 @@ get_cpu_wait_type(struct vk_physical_device *pdevice)
 VKAPI_ATTR VkResult VKAPI_CALL
 vk_common_QueueWaitIdle(VkQueue _queue)
 {
+   P2_SCOPE("vk_common_QueueWaitIdle");
    MESA_TRACE_FUNC();
 
    VK_FROM_HANDLE(vk_queue, queue, _queue);

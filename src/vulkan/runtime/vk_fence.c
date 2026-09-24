@@ -36,6 +36,23 @@
 #include "vk_physical_device.h"
 #include "vk_util.h"
 
+/* ---- P2 trace ---- */
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
+/* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+#include <stdio.h>
+#include <stdlib.h>
+static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+/* ---- end gate ---- */
+struct p2s { const char *n; long long t; };
+static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
+#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
+/* ---- end P2 ---- */
+
 static VkExternalFenceHandleTypeFlags
 vk_sync_fence_import_types(const struct vk_sync_type *type)
 {
@@ -204,6 +221,7 @@ vk_common_ResetFences(VkDevice _device,
                       uint32_t fenceCount,
                       const VkFence *pFences)
 {
+   P2_SCOPE("vk_common_ResetFences");
    VK_FROM_HANDLE(vk_device, device, _device);
 
    for (uint32_t i = 0; i < fenceCount; i++) {
@@ -230,6 +248,7 @@ VKAPI_ATTR VkResult VKAPI_CALL
 vk_common_GetFenceStatus(VkDevice _device,
                          VkFence _fence)
 {
+   P2_SCOPE("vk_common_GetFenceStatus");
    VK_FROM_HANDLE(vk_device, device, _device);
    VK_FROM_HANDLE(vk_fence, fence, _fence);
 
@@ -253,6 +272,7 @@ vk_common_WaitForFences(VkDevice _device,
                         VkBool32 waitAll,
                         uint64_t timeout)
 {
+   P2_SCOPE("vk_common_WaitForFences");
    MESA_TRACE_FUNC();
 
    VK_FROM_HANDLE(vk_device, device, _device);
@@ -350,6 +370,7 @@ VKAPI_ATTR VkResult VKAPI_CALL
 vk_common_ImportFenceFdKHR(VkDevice _device,
                            const VkImportFenceFdInfoKHR *pImportFenceFdInfo)
 {
+   P2_SCOPE("vk_common_ImportFenceFdKHR");
    VK_FROM_HANDLE(vk_device, device, _device);
    VK_FROM_HANDLE(vk_fence, fence, pImportFenceFdInfo->fence);
 
@@ -421,6 +442,7 @@ vk_common_GetFenceFdKHR(VkDevice _device,
                         const VkFenceGetFdInfoKHR *pGetFdInfo,
                         int *pFd)
 {
+   P2_SCOPE("vk_common_GetFenceFdKHR");
    VK_FROM_HANDLE(vk_device, device, _device);
    VK_FROM_HANDLE(vk_fence, fence, pGetFdInfo->fence);
 

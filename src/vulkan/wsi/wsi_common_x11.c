@@ -22,6 +22,7 @@
  */
 
 #include <X11/Xlib-xcb.h>
+#include <sys/prctl.h>
 #include <X11/xshmfence.h>
 #define XK_MISCELLANY
 #define XK_LATIN1
@@ -69,6 +70,13 @@
 #ifdef HAVE_SYS_SHM_H
 #include <sys/ipc.h>
 #include <sys/shm.h>
+
+/* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+#include <stdio.h>
+#include <stdlib.h>
+static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+/* ---- end gate ---- */
 #endif
 
 #ifndef XCB_PRESENT_OPTION_ASYNC_MAY_TEAR
@@ -1608,6 +1616,7 @@ static VkResult
 x11_handle_dri3_present_event(struct x11_swapchain *chain,
                               xcb_present_generic_event_t *event)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_handle_dri3_present_event", (long)gettid(), _n); fflush(stderr); }
    switch (event->evtype) {
    case XCB_PRESENT_CONFIGURE_NOTIFY: {
       xcb_present_configure_notify_event_t *config = (void *) event;
@@ -1744,6 +1753,7 @@ static VkResult
 x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
                         uint64_t target_msc, VkPresentModeKHR present_mode)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_present_to_x11_dri3", (long)gettid(), _n); fflush(stderr); }
    struct x11_image *image = &chain->images[image_index];
 
    assert(image_index < chain->base.image_count);
@@ -1849,6 +1859,7 @@ x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
 static VkResult
 x11_present_to_x11_sw(struct x11_swapchain *chain, uint32_t image_index)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_present_to_x11_sw", (long)gettid(), _n); fflush(stderr); }
    assert(!chain->base.image_info.explicit_sync);
    struct x11_image *image = &chain->images[image_index];
 
@@ -2074,6 +2085,7 @@ static VkResult
 x11_present_to_x11(struct x11_swapchain *chain, uint32_t image_index,
                    uint64_t target_msc, VkPresentModeKHR present_mode)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_present_to_x11", (long)gettid(), _n); fflush(stderr); }
    x11_capture_trace(chain);
 
    VkResult result;
@@ -2157,6 +2169,7 @@ x11_acquire_next_image(struct wsi_swapchain *wsi_chain,
                        const VkAcquireNextImageInfoKHR *info,
                        uint32_t *image_index)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_acquire_next_image", (long)gettid(), _n); fflush(stderr); }
    fprintf(stderr, "[ACQ] enter x11_acquire_next_image\n");
    struct x11_swapchain *chain = (struct x11_swapchain *)wsi_chain;
    uint64_t timeout = info->timeout;
@@ -2217,6 +2230,7 @@ x11_queue_present(struct wsi_swapchain *wsi_chain,
                   uint64_t present_id,
                   const VkPresentRegionKHR *damage)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_queue_present", (long)gettid(), _n); fflush(stderr); }
    struct x11_swapchain *chain = (struct x11_swapchain *)wsi_chain;
    xcb_xfixes_region_t update_area = 0;
 
@@ -2281,6 +2295,7 @@ static unsigned x11_driver_owned_images(const struct x11_swapchain *chain)
 static int
 x11_manage_event_queue(void *state)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_manage_event_queue", (long)gettid(), _n); fflush(stderr); }
    struct x11_swapchain *chain = state;
    u_thread_setname("WSI swapchain event");
 
@@ -2498,6 +2513,7 @@ x11_present_compute_target_msc(struct x11_swapchain *chain,
 static int
 x11_manage_present_queue(void *state)
 {
+   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "x11_manage_present_queue", (long)gettid(), _n); fflush(stderr); }
    struct x11_swapchain *chain = state;
    struct wsi_x11_connection *wsi_conn =
          wsi_x11_get_connection((struct wsi_device*)chain->base.wsi, chain->conn);
