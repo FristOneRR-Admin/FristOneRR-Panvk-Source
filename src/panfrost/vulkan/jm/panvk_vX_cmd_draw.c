@@ -1954,7 +1954,8 @@ v9_translate_stencil_op(VkStencilOp in)
 
 static void
 v9_emit_vs_attrib(struct panvk_cmd_buffer *cmdbuf, uint32_t attrib_idx,
-                  uint32_t vb_desc_offset, struct mali_attribute_packed *desc)
+                  uint32_t vb_desc_offset, struct mali_attribute_packed *desc,
+                  uint32_t base_instance)
 {
    const struct vk_dynamic_graphics_state *dyns =
       &cmdbuf->vk.dynamic_graphics_state;
@@ -1966,7 +1967,11 @@ v9_emit_vs_attrib(struct panvk_cmd_buffer *cmdbuf, uint32_t attrib_idx,
    enum pipe_format f = vk_format_to_pipe_format(attrib_info->format);
 
    pan_pack(desc, ATTRIBUTE, cfg) {
-      cfg.offset = attrib_info->offset;
+      /* Valhall doesn't add firstInstance when fetching per-instance
+       * attributes, so fold it into the attribute offset. */
+      cfg.offset = attrib_info->offset +
+                   ((per_instance && buf_info->divisor)
+                       ? (base_instance / buf_info->divisor) * stride : 0);
       cfg.format = GENX(pan_format_from_pipe_format)(f)->hw;
       cfg.table = 0;
       cfg.buffer_index = vb_desc_offset + attrib_info->binding;
@@ -1994,7 +1999,7 @@ v9_emit_vs_attrib(struct panvk_cmd_buffer *cmdbuf, uint32_t attrib_idx,
 }
 
 static VkResult
-v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf)
+v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf, uint32_t base_instance)
 {
    const struct panvk_shader_desc_info *vs_desc_info =
       &cmdbuf->state.gfx.vs.shader->desc_info;
@@ -2017,7 +2022,7 @@ v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf)
    struct panvk_opaque_desc *descs = driver_set.cpu;
    for (uint32_t i = 0; i < MAX_VS_ATTRIBS; i++) {
       if (vi->attributes_valid & BITFIELD_BIT(i))
-         v9_emit_vs_attrib(cmdbuf, i, vb_offset, (void *)&descs[i]);
+         v9_emit_vs_attrib(cmdbuf, i, vb_offset, (void *)&descs[i], base_instance);
       else
          pan_cast_and_pack(&descs[i], NULL_DESCRIPTOR, cfg);
    }
@@ -2256,7 +2261,12 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       if (fs) {
          cfg.flags_0.pixel_kill_operation = MALI_PIXEL_KILL_FORCE_EARLY;
          cfg.flags_0.zs_update_operation = MALI_PIXEL_KILL_FORCE_EARLY;
-         cfg.flags_0.allow_forward_pixel_to_kill = fs->info.fs.can_fpk;
+         /* FPK would discard what lies underneath; only allowed when blending
+          * doesn't read the destination (and no alpha-to-coverage). */
+         cfg.flags_0.allow_forward_pixel_to_kill =
+            fs->info.fs.can_fpk &&
+            !cmdbuf->state.gfx.cb.info.any_dest_read &&
+            !dyns->ms.alpha_to_coverage_enable;
          cfg.flags_0.allow_forward_pixel_to_be_killed = !fs->info.writes_global;
          cfg.flags_1.render_target_mask =
             color_attachment_written_mask(fs, &cmdbuf->vk.dynamic_graphics_state.cal);
@@ -2357,7 +2367,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    result = panvk_per_arch(cmd_prepare_push_descs)(cmdbuf, desc_state, used);
    if (result != VK_SUCCESS)
       return;
-   result = v9_prepare_vs_driver_set(cmdbuf);
+   result = v9_prepare_vs_driver_set(cmdbuf, info->instance.base);
    if (result != VK_SUCCESS)
       return;
    result = panvk_per_arch(cmd_prepare_shader_res_table)(
