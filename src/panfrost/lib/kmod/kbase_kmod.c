@@ -62,6 +62,11 @@
 #include "kbase_kmod.h"
 #include "pan_kmod_backend.h"
 #include "pan_props.h"
+#include <pthread.h>
+/* Only one thread may drain kbase events at a time, and only when poll(0)
+ * confirms an event is really there, otherwise a waiter that lost the race
+ * blocks forever inside read() on the blocking kbase fd. */
+static pthread_mutex_t g_kbase_read_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* Forward declaration — the full definition is at the end of this file. */
 const struct pan_kmod_ops kbase_kmod_ops;
@@ -2178,10 +2183,17 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          continue;
 
       struct base_jd_event_v2 ev;
-      ssize_t n;
-      do {
-         n = read(fd, &ev, sizeof(ev));
-      } while (n < 0 && errno == EINTR);
+      ssize_t n = -1;
+      pthread_mutex_lock(&g_kbase_read_lock);
+      {
+         struct pollfd rfd = { .fd = fd, .events = POLLIN };
+         if (poll(&rfd, 1, 0) > 0 && (rfd.revents & POLLIN)) {
+            do {
+               n = read(fd, &ev, sizeof(ev));
+            } while (n < 0 && errno == EINTR);
+         }
+      }
+      pthread_mutex_unlock(&g_kbase_read_lock);
 
       if (n == (ssize_t)sizeof(ev)) {
          simple_mtx_lock(&kd->atoms_lock);
