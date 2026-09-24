@@ -2108,12 +2108,16 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
 {
    for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
       if (kd->atoms[i].atom_number == ev->atom_number) {
+         fprintf(stderr, "[K1] event atom=%u code=0x%x waiters=%u\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, (unsigned)kd->atoms[i].waiters);
          kd->atoms[i].completed = true;
          kd->atoms[i].errored = (ev->event_code != BASE_JD_EVENT_DONE);
             kd->last_event_code[ev->atom_number & 0xff] = ev->event_code;
+         if (kd->atoms[i].waiters == 0)
+            kd->atoms[i].atom_number = 0;
          return;
       }
    }
+   fprintf(stderr, "[K1] event atom=%u code=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code);
 }
 
 
@@ -2250,6 +2254,58 @@ kbase_kmod_job_submit(struct pan_kmod_dev *dev,
    };
    if (ioctl(dev->fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
       mesa_loge("kbase: JOB_SUBMIT err=%d", errno);
+      simple_mtx_lock(&kd->atoms_lock);
+      slot->atom_number = 0;
+      simple_mtx_unlock(&kd->atoms_lock);
+      return 0;
+   }
+   return slot->atom_number;
+}
+
+uint64_t
+kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req,
+                          struct pan_kmod_bo **bos, uint32_t nbo,
+                          uint64_t dep0, uint8_t dep0_type,
+                          uint64_t dep1, uint8_t dep1_type, bool no_waiter)
+{
+   struct kbase_kmod_dev *kd = container_of(dev, struct kbase_kmod_dev, base);
+   assert(!kd->is_csf && "kbase_kmod_job_submit_dep is JM-only");
+
+   struct kbase_atom_slot *slot = kbase_atom_alloc(kd, bos, nbo);
+   if (!slot)
+      return 0;
+   if (no_waiter) {
+      simple_mtx_lock(&kd->atoms_lock);
+      slot->waiters = 0;
+      simple_mtx_unlock(&kd->atoms_lock);
+   }
+
+   struct base_jd_atom atom = {
+      .jc = jc,
+      .core_req = core_req,
+      .atom_number = (uint8_t)slot->atom_number,
+      .prio = 0, /* BASE_JD_PRIO_MEDIUM */
+      .device_nr = 0,
+   };
+   uint64_t deps[2] = { dep0, dep1 };
+   uint8_t types[2] = { dep0_type, dep1_type };
+   if (deps[1] == deps[0])
+      deps[1] = 0;
+   for (int i = 0; i < 2; i++) {
+      bool use = deps[i] && types[i] && deps[i] != slot->atom_number;
+      atom.pre_dep[i].atom_id = use ? (uint8_t)deps[i] : 0;
+      atom.pre_dep[i].dependency_type = use ? types[i] : 0;
+   }
+
+   struct kbase_ioctl_job_submit sub = {
+      .addr = (uint64_t)(uintptr_t)&atom,
+      .nr_atoms = 1,
+      .stride = sizeof(atom),
+   };
+   fprintf(stderr, "[K1] submit atom=%u req=0x%x dep0=%u/%u dep1=%u/%u nw=%d sizeof=%zu\n", (unsigned)atom.atom_number, (unsigned)core_req, atom.pre_dep[0].atom_id, atom.pre_dep[0].dependency_type, atom.pre_dep[1].atom_id, atom.pre_dep[1].dependency_type, (int)no_waiter, sizeof(atom));
+   if (ioctl(dev->fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
+      mesa_loge("kbase: JOB_SUBMIT(dep) err=%d", errno);
+      fprintf(stderr, "[K1] SUBMIT FAILED atom=%u errno=%d\n", (unsigned)atom.atom_number, errno);
       simple_mtx_lock(&kd->atoms_lock);
       slot->atom_number = 0;
       simple_mtx_unlock(&kd->atoms_lock);

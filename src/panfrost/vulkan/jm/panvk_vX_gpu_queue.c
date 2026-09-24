@@ -93,12 +93,6 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
 
    if (batch->vtc_jc.first_job) {
-         /* Tiler heap is shared: don't let this tiler job overwrite it while the
-          * previous fragment job may still be reading it. */
-         if (batch->vtc_jc.first_tiler && queue->last_frag_atom) {
-            P4_WAIT(dev->kmod.dev, queue->last_frag_atom, -1);
-            queue->last_frag_atom = 0;
-         }
          if (unlikely(!queue->warmed_up)) {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
             fprintf(stderr, "[JC-DUMP] vtc_jc before first submit, core_req=0x%x, has_frag=%d\n", vtc_core_req, batch->frag_jc.first_job != 0);
@@ -108,10 +102,11 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
             queue->warmed_up = true;
          } else {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
-            vtc_atom = kbase_kmod_job_submit(
-         dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req,
-         bos, nr_bos, NULL, 0);
+            vtc_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req, bos, nr_bos,
+                batch->vtc_jc.first_tiler ? queue->last_frag_atom : 0, BASE_JD_DEP_TYPE_ORDER, queue->in_dep, BASE_JD_DEP_TYPE_ORDER,
+                batch->frag_jc.first_job != 0 && queue->frag_warmed_up);
             assert(vtc_atom);
+            queue->in_dep = 0;
 
       if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
          ASSERTED bool done =
@@ -143,7 +138,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
       /* The fragment job depends on the vertex/tiler job. kbase atoms can't
        * express that dependency for us, so block on the CPU here before
        * submitting the fragment job. */
-      if (vtc_atom) {
+      if (vtc_atom && unlikely(!queue->frag_warmed_up)) {
          bool done = P4_WAIT(dev->kmod.dev, vtc_atom, 16000000);
          fprintf(stderr,
                  "[FONTATLAS10.3] vtc-before-frag wait atom=%lu done=%d\n",
@@ -158,6 +153,10 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
       }
 
       if (unlikely(!queue->frag_warmed_up)) {
+         if (queue->in_dep) {
+            kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1);
+            queue->in_dep = 0;
+         }
          fprintf(stderr, "[FONTATLAS10.3] frag warm-up retry\n");
          fflush(stderr);
          bool ok = kbase_kmod_job_submit_retry(
@@ -168,11 +167,13 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
          fflush(stderr);
          frag_atom = 0;
       } else {
-         frag_atom = kbase_kmod_job_submit(dev->kmod.dev,
-                                            batch->frag_jc.first_job,
-                                            BASE_JD_REQ_FS, bos, nr_bos, NULL, 0);
+         frag_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->frag_jc.first_job,
+                                             BASE_JD_REQ_FS, bos, nr_bos,
+                                             vtc_atom, BASE_JD_DEP_TYPE_DATA,
+                                             queue->in_dep, BASE_JD_DEP_TYPE_ORDER, false);
          assert(frag_atom);
          queue->last_frag_atom = frag_atom;
+         queue->in_dep = 0;
       }
 
       PANVK_TRACE_PRINTF( "[PANDECODE-CHECK] frag reached, decode_ctx=%p debug=0x%llx first_job=0x%llx\n",
@@ -286,12 +287,35 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
          submit->wait_count);
       fflush(stderr);
 
-      VkResult result =
-         vk_sync_wait_many(&dev->vk,
-                           submit->wait_count,
-                           submit->waits,
-                           VK_SYNC_WAIT_COMPLETE,
-                           UINT64_MAX);
+      VkResult result = VK_SUCCESS;
+      uint64_t in_atoms[8];
+      unsigned n_in = 0;
+      for (uint32_t w = 0; w < submit->wait_count && result == VK_SUCCESS; w++) {
+         uint64_t wt[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
+         int k = panvk_kbase_sync_gpu_wait_targets(submit->waits[w].sync, wt);
+         if (k == 1)
+            continue;
+         if (k == 2) {
+            for (unsigned t = 0; t < PANVK_KBASE_SYNC_TARGET_COUNT; t++) {
+               if (!wt[t])
+                  continue;
+               if (n_in < ARRAY_SIZE(in_atoms))
+                  in_atoms[n_in++] = wt[t];
+               else
+                  kbase_kmod_wait_atom(dev->kmod.dev, wt[t], -1);
+            }
+            continue;
+         }
+         /* wait-before-signal or foreign sync: fall back to a CPU wait */
+         result = vk_sync_wait(&dev->vk, submit->waits[w].sync,
+                               submit->waits[w].wait_value,
+                               VK_SYNC_WAIT_COMPLETE, UINT64_MAX);
+      }
+      /* One atom goes to the GPU as a pre-dependency, extra ones are
+       * waited on the CPU (rare). */
+      for (unsigned a = 1; a < n_in; a++)
+         kbase_kmod_wait_atom(dev->kmod.dev, in_atoms[a], -1);
+      queue->in_dep = n_in ? in_atoms[0] : 0;
 
       PANVK_TRACE_PRINTF(
          "[FONTATLAS10.3] JM incoming waits=%u: CPU wait result=%d\\n",
@@ -380,6 +404,13 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
    }
 
 
+   if (queue->in_dep) {
+      if (ntargets < PANVK_KBASE_SYNC_TARGET_COUNT)
+         targets[ntargets++] = queue->in_dep;
+      else
+         kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1);
+      queue->in_dep = 0;
+   }
    if (ntargets == 0 && queue->last_submitted_atom)
       targets[ntargets++] = queue->last_submitted_atom;
 

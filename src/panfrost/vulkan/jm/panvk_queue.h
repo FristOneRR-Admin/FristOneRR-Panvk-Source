@@ -31,6 +31,8 @@ struct panvk_gpu_queue {
    /* Previous fragment atom: the tiler heap is shared, so a new tiler job must
     * not start until the previous fragment job has consumed the heap. */
    uint64_t last_frag_atom;
+   /* GPU atom this submit's first job must wait for (from wait semaphores). */
+   uint64_t in_dep;
 };
 
 VK_DEFINE_HANDLE_CASTS(panvk_gpu_queue, vk.base, VkQueue, VK_OBJECT_TYPE_QUEUE)

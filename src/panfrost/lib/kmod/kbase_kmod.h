@@ -39,6 +39,18 @@ uint64_t kbase_kmod_job_submit(struct pan_kmod_dev *dev,
 bool kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req, struct pan_kmod_bo **bos, uint32_t nbo, struct base_external_resource *ext_res, uint32_t next_res,
                                 int max_attempts);
 
+#ifndef BASE_JD_DEP_TYPE_DATA
+#define BASE_JD_DEP_TYPE_DATA 1
+#define BASE_JD_DEP_TYPE_ORDER 2
+#endif
+/* Submit with up to two kbase pre-dependencies (0 = none). If no_waiter is
+ * set, nobody will kbase_kmod_wait_atom() on it and its slot is recycled as
+ * soon as its completion event is processed. */
+uint64_t kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req,
+                                   struct pan_kmod_bo **bos, uint32_t nbo,
+                                   uint64_t dep0, uint8_t dep0_type,
+                                   uint64_t dep1, uint8_t dep1_type, bool no_waiter);
+
 bool kbase_kmod_wait_atom(struct pan_kmod_dev *dev, uint64_t atom_number,
                           int64_t timeout_ns);
 

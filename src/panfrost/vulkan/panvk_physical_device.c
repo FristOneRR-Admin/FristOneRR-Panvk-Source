@@ -763,6 +763,31 @@ panvk_kbase_sync_set_pending(
    mtx_unlock(&ks->mutex);
 }
 
+/* For vkQueueSubmit waits: 1 = already signaled, 2 = pending on GPU atoms
+ * (copied to out[]), 0 = a CPU wait is required (unsignaled / not kbase). */
+int
+panvk_kbase_sync_gpu_wait_targets(struct vk_sync *sync,
+                                  uint64_t out[PANVK_KBASE_SYNC_TARGET_COUNT])
+{
+   if (sync->type->wait_many != kbase_cpu_sync_wait_many)
+      return 0;
+   struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
+   int r = 0;
+   mtx_lock(&ks->mutex);
+   if (ks->state == KBASE_CPU_SYNC_SIGNALED) {
+      r = 1;
+   } else if (ks->state == KBASE_CPU_SYNC_PENDING || ks->state == KBASE_CPU_SYNC_WAITING) {
+      bool any = false;
+      for (unsigned i = 0; i < PANVK_KBASE_SYNC_TARGET_COUNT; i++) {
+         out[i] = ks->targets[i];
+         any |= ks->targets[i] != 0;
+      }
+      r = any ? 2 : 1;
+   }
+   mtx_unlock(&ks->mutex);
+   return r;
+}
+
 static VkResult
 kbase_cpu_sync_wait_one_impl(struct vk_device *device, struct kbase_cpu_sync *ks,
                         enum vk_sync_wait_flags wait_flags,
