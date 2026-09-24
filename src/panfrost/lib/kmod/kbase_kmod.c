@@ -2104,9 +2104,15 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
    }
 }
 
+
+static uint64_t g_last_done_atom[256];
+static uint32_t g_last_done_code[256];
+
 static bool
 kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns)
 {
+   if (atom_num == 0)
+      return true;
    int fd = kd->base.fd;
    int64_t deadline = 0;
    bool use_dl = timeout_ns >= 0;
@@ -2115,6 +2121,7 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
       clock_gettime(CLOCK_MONOTONIC_RAW, &now);
       deadline = (int64_t)now.tv_sec * 1000000000ll + now.tv_nsec + timeout_ns;
    }
+
    for (;;) {
       simple_mtx_lock(&kd->atoms_lock);
       bool present = false;
@@ -2134,15 +2141,19 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          break;
       }
       if (!present) {
-         /* Already completed and reaped by another waiter: the queue sync
-          * and every signal sync of a submit wait on the same atoms. */
-         bool ok = !kd->atom_failed[atom_num & 0xff];
+         bool bad = kd->atom_failed[atom_num & 0xff];
+         uint32_t code = kd->last_event_code[atom_num & 0xff];
          simple_mtx_unlock(&kd->atoms_lock);
-         return ok;
+         if (bad)
+            return false;
+         if (g_last_done_atom[atom_num & 0xff] == atom_num &&
+             g_last_done_code[atom_num & 0xff] == BASE_JD_EVENT_DONE)
+            return true;
+      } else {
+         simple_mtx_unlock(&kd->atoms_lock);
       }
-      simple_mtx_unlock(&kd->atoms_lock);
 
-      int ms = -1;
+      int ms = 10;
       if (use_dl) {
          struct timespec now;
          clock_gettime(CLOCK_MONOTONIC_RAW, &now);
@@ -2150,21 +2161,21 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          if (rem <= 0)
             return false;
          ms = (int)(rem / 1000000);
-         if (!ms)
+         if (ms > 10)
+            ms = 10;
+         if (ms < 1)
             ms = 1;
       }
 
       struct pollfd pfd = { .fd = fd, .events = POLLIN };
-      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): poll() ms=%d\n", (unsigned long)atom_num, ms); fflush(stderr);
       int r = poll(&pfd, 1, ms);
-      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): poll() returned r=%d revents=0x%x\n", (unsigned long)atom_num, r, pfd.revents); fflush(stderr);
       if (r < 0) {
          if (errno == EINTR)
             continue;
          return false;
       }
       if (r == 0)
-         return false;
+         continue;
 
       struct base_jd_event_v2 ev;
       ssize_t n;
@@ -2172,15 +2183,16 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          n = read(fd, &ev, sizeof(ev));
       } while (n < 0 && errno == EINTR);
 
-
-      PANVK_TRACE_PRINTF( "[TRACE] wait_atom(%lu): read() n=%zd errno=%d event_code=0x%x event_atom=%u\n", (unsigned long)atom_num, n, errno, n==(ssize_t)sizeof(ev)?ev.event_code:0, n==(ssize_t)sizeof(ev)?ev.atom_number:0); fflush(stderr);
       if (n == (ssize_t)sizeof(ev)) {
          simple_mtx_lock(&kd->atoms_lock);
          kbase_atom_process_event_locked(kd, &ev);
+         g_last_done_atom[ev.atom_number & 0xff] = ev.atom_number;
+         g_last_done_code[ev.atom_number & 0xff] = ev.event_code;
          simple_mtx_unlock(&kd->atoms_lock);
       }
    }
 }
+
 
 uint64_t
 kbase_kmod_job_submit(struct pan_kmod_dev *dev,

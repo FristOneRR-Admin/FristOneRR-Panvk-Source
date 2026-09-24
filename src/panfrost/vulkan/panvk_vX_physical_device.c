@@ -44,7 +44,6 @@ panvk_per_arch(get_physical_device_extensions)(
    bool has_gralloc = vk_android_get_ugralloc() != NULL;
    fprintf(stderr, "[FristOneRR1] has_gralloc=%d ugralloc=%p\n",
            (int)has_gralloc, (void*)vk_android_get_ugralloc());
-   fflush(stderr);
 
    *ext = (struct vk_device_extension_table){
       .KHR_8bit_storage = true,

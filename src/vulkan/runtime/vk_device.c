@@ -22,6 +22,8 @@
  */
 
 #include "vk_device.h"
+#include <string.h>
+#include <stdio.h>
 
 #include "vk_alloc.h"
 #include "vk_common_entrypoints.h"
@@ -463,8 +465,9 @@ vk_device_get_proc_addr(const struct vk_device *device,
                                                     &device->enabled_extensions);
 }
 
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_common_GetDeviceProcAddr_real(VkDevice, const char *);
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
-vk_common_GetDeviceProcAddr(VkDevice _device,
+vk_common_GetDeviceProcAddr_real(VkDevice _device,
                             const char *pName)
 {
    VK_FROM_HANDLE(vk_device, device, _device);
@@ -963,4 +966,13 @@ vk_common_GetCalibratedTimestampsKHR(
    *pMaxDeviation = vk_time_max_deviation(begin, end, max_clock_period);
 
    return VK_SUCCESS;
+}
+
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
+vk_common_GetDeviceProcAddr(VkDevice d, const char *n)
+{
+   PFN_vkVoidFunction r = vk_common_GetDeviceProcAddr_real(d, n);
+   if (n && strstr(n, "AcquireNextImage"))
+      fprintf(stderr, "[ACQ] GetDeviceProcAddr(%s) -> %p\n", n, (void *)r);
+   return r;
 }

@@ -22,6 +22,8 @@
  */
 
 #include "vk_sync.h"
+#include <dlfcn.h>
+#include <stdio.h>
 
 #include <assert.h>
 #include <string.h>
@@ -117,6 +119,18 @@ vk_sync_create(struct vk_device *device,
                uint64_t initial_value,
                struct vk_sync **sync_out)
 {
+   if (!type) {
+      void *ra = __builtin_return_address(0);
+      Dl_info di;
+      if (dladdr(ra, &di))
+         fprintf(stderr, "[SYNC] vk_sync_create type=NULL caller=%s ra_off=%#lx sym=%s\n",
+                 di.dli_fname ? di.dli_fname : "?",
+                 (unsigned long)((char *)ra - (char *)di.dli_fbase),
+                 di.dli_sname ? di.dli_sname : "?");
+      else
+         fprintf(stderr, "[SYNC] vk_sync_create type=NULL ra=%p\n", ra);
+      return VK_ERROR_FEATURE_NOT_PRESENT;
+   }
    struct vk_sync *sync;
 
    sync = vk_alloc(&device->alloc, type->size, 8,

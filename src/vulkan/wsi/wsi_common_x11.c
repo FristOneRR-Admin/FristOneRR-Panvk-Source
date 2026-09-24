@@ -2157,6 +2157,7 @@ x11_acquire_next_image(struct wsi_swapchain *wsi_chain,
                        const VkAcquireNextImageInfoKHR *info,
                        uint32_t *image_index)
 {
+   fprintf(stderr, "[ACQ] enter x11_acquire_next_image\n");
    struct x11_swapchain *chain = (struct x11_swapchain *)wsi_chain;
    uint64_t timeout = info->timeout;
 

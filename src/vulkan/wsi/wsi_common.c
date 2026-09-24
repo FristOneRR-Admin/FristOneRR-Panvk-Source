@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include "wsi_common_private.h"
 #include "wsi_common_entrypoints.h"
@@ -2193,6 +2194,7 @@ wsi_AcquireNextImageKHR(VkDevice _device,
                         VkFence fence,
                         uint32_t *pImageIndex)
 {
+   fprintf(stderr, "[ACQ] enter wsi_AcquireNextImageKHR\n");
    MESA_TRACE_FUNC();
    VK_FROM_HANDLE(vk_device, device, _device);
 
@@ -2275,6 +2277,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
                                const VkAcquireNextImageInfoKHR *pAcquireInfo,
                                uint32_t *pImageIndex)
 {
+   fprintf(stderr, "[ACQ] enter wsi_common_acquire_next_image2\n");
    VK_FROM_HANDLE(wsi_swapchain, swapchain, pAcquireInfo->swapchain);
    VK_FROM_HANDLE(vk_device, device, _device);
 
@@ -2283,6 +2286,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
    fflush(stderr);
    VkResult result = swapchain->acquire_next_image(swapchain, pAcquireInfo,
                                                    pImageIndex);
+   fprintf(stderr, "[ACQ] platform acquire result=%d\n", (int)result);
    fprintf(stderr, "[FristOneRR1] acquire_next_image result=0x%x idx=%u\n",
            result, pImageIndex ? *pImageIndex : 0);
    fflush(stderr);
@@ -2320,6 +2324,7 @@ wsi_AcquireNextImage2KHR(VkDevice _device,
                          const VkAcquireNextImageInfoKHR *pAcquireInfo,
                          uint32_t *pImageIndex)
 {
+   fprintf(stderr, "[ACQ] enter wsi_AcquireNextImage2KHR\n");
    MESA_TRACE_FUNC();
    VK_FROM_HANDLE(vk_device, device, _device);
 

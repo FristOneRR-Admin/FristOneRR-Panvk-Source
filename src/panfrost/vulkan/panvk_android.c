@@ -267,7 +267,7 @@ panvk_android_import_ahb_memory(VkDevice device,
    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(ahb);
    assert(handle && handle->numFds > 0);
    int dma_buf_fd = handle->data[0];
-    fprintf(stderr, "[FristOneRR1] numFds=%d\n", handle->numFds); fflush(stderr);
+   fprintf(stderr, "[FristOneRR1] numFds=%d\n", handle->numFds);
    for (int i = 0; i < handle->numFds; i++) {
       off_t sz = lseek(handle->data[i], 0, SEEK_END);
       fprintf(stderr, "[FristOneRR1] import fd[%d]=%d seek=%lld\n",

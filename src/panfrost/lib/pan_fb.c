@@ -99,8 +99,9 @@ align_fb_tiling_area_for_image_plane(struct pan_fb_layout *fb,
       bool scan = pan_afrc_is_scan(pref.image->props.modifier);
       block_size = pan_afrc_clump_size(pref.image->props.format, scan);
    } else {
-      /* No alignment requirements */
-      return;
+      /* Valhall still rasterizes 16x16 tiles for linear/U-interleaved. */
+      block_size.width = 16;
+      block_size.height = 16;
    }
 
    fb->tiling_area_px = pan_fb_bbox_align(fb->tiling_area_px,
