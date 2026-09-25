@@ -107,10 +107,11 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
          } else {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
             vtc_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req, bos, nr_bos,
-                batch->vtc_jc.first_tiler ? queue->last_frag_atom : 0, BASE_JD_DEP_TYPE_ORDER, queue->in_dep, BASE_JD_DEP_TYPE_ORDER,
+                (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom), BASE_JD_DEP_TYPE_ORDER, queue->in_dep, BASE_JD_DEP_TYPE_ORDER,
                 batch->frag_jc.first_job != 0 && queue->frag_warmed_up);
             assert(vtc_atom);
             queue->in_dep = 0;
+            queue->last_any_atom = vtc_atom;
 
       if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC)) {
          ASSERTED bool done =
@@ -173,10 +174,15 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
       } else {
          frag_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->frag_jc.first_job,
                                              BASE_JD_REQ_FS, bos, nr_bos,
-                                             vtc_atom, BASE_JD_DEP_TYPE_DATA,
+                                             vtc_atom ? vtc_atom : queue->last_any_atom,
+                                             vtc_atom ? BASE_JD_DEP_TYPE_DATA : BASE_JD_DEP_TYPE_ORDER,
                                              queue->in_dep, BASE_JD_DEP_TYPE_ORDER, false);
          assert(frag_atom);
-         queue->last_frag_atom = frag_atom;
+         queue->last_frag_atom = frag_atom; queue->last_any_atom = frag_atom;
+         if (!vtc_atom) {
+            static int fo = 0;
+            if (fo++ < 3) dprintf(2, "[FRAGONLY] frag-only batch #%d now ordered after prior atom\n", fo);
+         }
          queue->in_dep = 0;
       }
 

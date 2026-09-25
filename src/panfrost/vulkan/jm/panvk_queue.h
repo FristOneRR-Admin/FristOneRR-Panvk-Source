@@ -33,6 +33,8 @@ struct panvk_gpu_queue {
    uint64_t last_frag_atom;
    /* GPU atom this submit's first job must wait for (from wait semaphores). */
    uint64_t in_dep;
+   /* Last atom submitted on this queue (vtc/compute or frag). */
+   uint64_t last_any_atom;
 };
 
 VK_DEFINE_HANDLE_CASTS(panvk_gpu_queue, vk.base, VkQueue, VK_OBJECT_TYPE_QUEUE)

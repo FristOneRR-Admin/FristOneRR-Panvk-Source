@@ -2235,6 +2235,19 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
 static uint64_t g_last_done_atom[256];
 static uint32_t g_last_done_code[256];
 
+static int
+kbase_poll_ms(void)
+{
+   static int v = -1;
+   if (v < 0) {
+      const char *e = getenv("KBASE_POLL_MS");
+      v = e ? atoi(e) : 1;
+      if (v < 1) v = 1;
+      dprintf(2, "[POLLMS] %d\n", v);
+   }
+   return v;
+}
+
 static bool
 kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns)
 {
@@ -2280,7 +2293,7 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          simple_mtx_unlock(&kd->atoms_lock);
       }
 
-      int ms = 10;
+      int ms = kbase_poll_ms();
       if (use_dl) {
          struct timespec now;
          clock_gettime(CLOCK_MONOTONIC_RAW, &now);
@@ -2288,8 +2301,8 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          if (rem <= 0)
             return false;
          ms = (int)(rem / 1000000);
-         if (ms > 10)
-            ms = 10;
+         if (ms > kbase_poll_ms())
+            ms = kbase_poll_ms();
          if (ms < 1)
             ms = 1;
       }

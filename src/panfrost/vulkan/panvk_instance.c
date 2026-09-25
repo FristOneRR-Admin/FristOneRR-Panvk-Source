@@ -67,6 +67,10 @@ panvk_debug_init_once(void)
 {
    panvk_debug =
       parse_debug_string(os_get_option("PANVK_DEBUG"), panvk_debug_options);
+   /* AFBC writes through the graphics copy path are broken on v9/kbase
+    * (missing superblocks sample as black). Keep AFBC off unless asked. */
+   if (!os_get_option("PANVK_ENABLE_AFBC"))
+      panvk_debug |= PANVK_DEBUG_NO_AFBC;
 }
 
 static void

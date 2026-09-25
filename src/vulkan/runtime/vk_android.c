@@ -60,13 +60,21 @@
 /* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef PANVK_TRACE_BUILD
 static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#else
+#define panvk_trace_on_() 0
+#endif
 #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
 /* ---- end gate ---- */
 struct p2s { const char *n; long long t; };
 static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
 static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
+#ifdef PANVK_TRACE_BUILD
 #define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
+#else
+#define P2_SCOPE(nm) ((void)0)
+#endif
 /* ---- end P2 ---- */
 
 static struct u_gralloc *_gralloc;
