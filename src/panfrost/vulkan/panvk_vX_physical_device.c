@@ -326,7 +326,7 @@ panvk_per_arch(get_physical_device_features)(
       .sampleRateShading = true,
       .dualSrcBlend = true,
       .logicOp = true,
-      .multiDrawIndirect = PAN_ARCH >= 10,
+      .multiDrawIndirect = PAN_ARCH >= 9,
       .drawIndirectFirstInstance = true,
       .depthClamp = true,
       .depthBiasClamp = true,

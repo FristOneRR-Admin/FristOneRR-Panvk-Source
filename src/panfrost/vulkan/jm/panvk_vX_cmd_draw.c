@@ -1,3 +1,4 @@
+#include <stdio.h>
 /*
  * Copyright © 2024 Collabora Ltd.
  * Copyright © 2026 NXP
@@ -2322,7 +2323,28 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       }
    }
 
-   pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, false, false, 0, 0, &job, false);
+   unsigned indirect_dep = 0;
+   if (info->indirect.buffer_dev_addr) {
+      uint64_t fv_ptr = 0, bi_ptr = 0;
+      if (shader_uses_sysval(vs, graphics, vs.first_vertex))
+         fv_ptr = cmdbuf->state.gfx.vs.push_uniforms +
+                  shader_remapped_sysval_offset(
+                     vs, sysval_offset(graphics, vs.first_vertex));
+      if (shader_uses_sysval(vs, graphics, vs.base_instance))
+         bi_ptr = cmdbuf->state.gfx.vs.push_uniforms +
+                  shader_remapped_sysval_offset(
+                     vs, sysval_offset(graphics, vs.base_instance));
+
+      struct panvk_precomp_ctx pctx = panvk_per_arch(precomp_cs)(cmdbuf);
+      panlib_v9_draw_indirect_patch(&pctx, panlib_1d(1),
+                                    PANLIB_BARRIER_JM_SUPPRESS_PREFETCH,
+                                    info->indirect.buffer_dev_addr, job.gpu,
+                                    info->index.buffer_dev_addr, fv_ptr, bi_ptr,
+                                    info->index.index_size);
+      indirect_dep = batch->vtc_jc.job_index;
+   }
+   pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, false, false, 0,
+                  indirect_dep, &job, false);
    return VK_SUCCESS;
 }
 
@@ -2481,7 +2503,27 @@ panvk_per_arch(CmdDrawIndirect)(VkCommandBuffer commandBuffer, VkBuffer _buffer,
                                 VkDeviceSize offset, uint32_t drawCount,
                                 uint32_t stride)
 {
-   UNREACHABLE("CmdDrawIndirect not yet implemented for arch 9");
+   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
+   VK_FROM_HANDLE(panvk_buffer, buffer, _buffer);
+
+   for (uint32_t i = 0; i < drawCount; i++) {
+      struct panvk_draw_info info = {
+         .vertex.count = 1,
+         .instance.count = 1,
+         .indirect.buffer_dev_addr =
+            panvk_buffer_gpu_ptr(buffer, offset + (uint64_t)i * stride),
+         .indirect.draw_count = 1,
+         .prim = panvk_get_client_prim(cmdbuf),
+      };
+      static int logn = 0;
+      if (logn++ < 5)
+         dprintf(2, "[V9-INDIRECT] draw #%d count=%u\n", logn, drawCount);
+      /* The helper patches sysvals in the push-uniform block: make sure this
+       * draw gets its own block and the next draw doesn't reuse it. */
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+      v9_cmd_draw(cmdbuf, &info);
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+   }
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -2489,7 +2531,29 @@ panvk_per_arch(CmdDrawIndexedIndirect)(VkCommandBuffer commandBuffer,
                                        VkBuffer _buffer, VkDeviceSize offset,
                                        uint32_t drawCount, uint32_t stride)
 {
-   UNREACHABLE("CmdDrawIndexedIndirect not yet implemented for arch 9");
+   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
+   VK_FROM_HANDLE(panvk_buffer, buffer, _buffer);
+
+   if (cmdbuf->state.gfx.ib.index_size == 0 || cmdbuf->state.gfx.ib.size == 0)
+      return;
+
+   for (uint32_t i = 0; i < drawCount; i++) {
+      struct panvk_draw_info info = {
+         .index = panvk_draw_info_index(cmdbuf, 0),
+         .vertex.count = 1,
+         .instance.count = 1,
+         .indirect.buffer_dev_addr =
+            panvk_buffer_gpu_ptr(buffer, offset + (uint64_t)i * stride),
+         .indirect.draw_count = 1,
+         .prim = panvk_get_client_prim(cmdbuf),
+      };
+      static int logn = 0;
+      if (logn++ < 5)
+         dprintf(2, "[V9-INDIRECT] indexed draw #%d count=%u\n", logn, drawCount);
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+      v9_cmd_draw(cmdbuf, &info);
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+   }
 }
 
 #endif /* PAN_ARCH != 9 */
