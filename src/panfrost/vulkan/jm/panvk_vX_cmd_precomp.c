@@ -89,7 +89,11 @@ panvk_per_arch(dispatch_precomp)(struct panvk_precomp_ctx *ctx,
       cfg.compute.shader = panvk_priv_mem_dev_addr(shader->spd);
       cfg.compute.thread_storage = tld;
       cfg.compute.fau = push_uniforms.gpu;
-      cfg.compute.fau_count = shader->fau.total_count;
+      /* Precompiled kernels are created from a binary: fau.total_count is
+       * never filled.  The FAU block is sysvals + kernel args, in 64-bit
+       * words. */
+      cfg.compute.fau_count =
+         DIV_ROUND_UP(BIFROST_PRECOMPILED_KERNEL_SYSVALS_SIZE + data_size, 8);
    }
 #else
    pan_section_pack(job.cpu, COMPUTE_JOB, PARAMETERS, cfg) {

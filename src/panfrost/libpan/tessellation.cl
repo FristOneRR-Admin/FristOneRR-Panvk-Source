@@ -68,3 +68,32 @@ panlib_prefix_sum_tess(global struct poly_tess_params *p)
 }
 
 #endif
+
+#if PAN_ARCH == 9
+/* Mali-G57 (v9) can't run the 1024-wide prefix-sum workgroup (its barrier
+ * never completes).  Single-thread serial version with identical results:
+ * inclusive scan of counts, index allocation and the indexed indirect draw. */
+KERNEL(1)
+panlib_prefix_sum_tess_serial(global struct poly_tess_params *p)
+{
+   uint32_t sum = 0;
+   for (uint32_t i = 0; i < p->nr_patches; i++) {
+      sum += p->counts[i];
+      p->counts[i] = sum;
+   }
+
+   const uint total = sum;
+   const uint32_t elsize_B = sizeof(uint32_t);
+   const uint alloc_B = poly_heap_alloc_offs(p->heap, total * elsize_B);
+
+   p->index_buffer =
+      (global uint32_t *)(((uintptr_t)p->heap->base) + alloc_B);
+
+   global uint32_t *draw = p->out_draws;
+   draw[0] = total;
+   draw[1] = 1;
+   draw[2] = alloc_B / elsize_B;
+   draw[3] = 0;
+   draw[4] = 0;
+}
+#endif

@@ -623,6 +623,11 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
                        pan_sample_positions_buffer_size());
 
 #if PAN_ARCH >= 10
+
+   result = panvk_per_arch(init_tiler_oom)(device);
+   if (result != VK_SUCCESS)
+      goto err_free_priv_bos;
+#endif
    /* Device-global libpoly bump heap.  The command stream resets the atomic
     * bottom pointer once before its first software-poly draw. */
    const uint64_t poly_heap_size = 128ull * 1024 * 1024;
@@ -641,10 +646,6 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
    };
    panvk_priv_bo_flush(device->poly_heap, 0, sizeof(*poly_heap));
 
-   result = panvk_per_arch(init_tiler_oom)(device);
-   if (result != VK_SUCCESS)
-      goto err_free_priv_bos;
-#endif
 
    result = panvk_priv_bo_create(device, PAN_PRINTF_BUFFER_SIZE, 0,
                                  VK_SYSTEM_ALLOCATION_SCOPE_DEVICE,

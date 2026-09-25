@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 /*
  * Copyright © 2024 Collabora Ltd.
@@ -31,6 +32,8 @@
 #include "panvk_shader.h"
 
 #include "draw_helper.h"
+#include "poly/geometry.h"
+#include "poly/tessellator.h"
 #include "pan_desc.h"
 #include "pan_earlyzs.h"
 #include "pan_encoder.h"
@@ -2000,11 +2003,12 @@ v9_emit_vs_attrib(struct panvk_cmd_buffer *cmdbuf, uint32_t attrib_idx,
 }
 
 static VkResult
-v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf, uint32_t base_instance)
+v9_prepare_vs_driver_set_ex(struct panvk_cmd_buffer *cmdbuf,
+                            const struct panvk_shader *vs_shader,
+                            struct panvk_shader_desc_state *st,
+                            uint32_t base_instance)
 {
-   const struct panvk_shader_desc_info *vs_desc_info =
-      &cmdbuf->state.gfx.vs.shader->desc_info;
-   struct panvk_shader_desc_state *st = &cmdbuf->state.gfx.vs.desc;
+   const struct panvk_shader_desc_info *vs_desc_info = &vs_shader->desc_info;
    const struct vk_vertex_input_state *vi =
       cmdbuf->vk.dynamic_graphics_state.vi;
    const struct panvk_descriptor_state *desc_state = &cmdbuf->state.gfx.desc_state;
@@ -2046,6 +2050,36 @@ v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf, uint32_t base_instance
       }
    }
 
+   st->driver_set.dev_addr = driver_set.gpu;
+   st->driver_set.size = desc_count * PANVK_DESCRIPTOR_SIZE;
+   return VK_SUCCESS;
+}
+
+static VkResult
+v9_prepare_vs_driver_set(struct panvk_cmd_buffer *cmdbuf, uint32_t base_instance)
+{
+   return v9_prepare_vs_driver_set_ex(cmdbuf, cmdbuf->state.gfx.vs.shader,
+                                      &cmdbuf->state.gfx.vs.desc, base_instance);
+}
+
+static VkResult
+v9_prepare_tess_compute_driver_set(struct panvk_cmd_buffer *cmdbuf,
+                                   const struct panvk_shader *shader,
+                                   struct panvk_shader_desc_state *st)
+{
+   const struct panvk_shader_desc_info *info = &shader->desc_info;
+   uint32_t desc_count = info->dyn_bufs.count + 1;
+   struct pan_ptr driver_set = panvk_cmd_alloc_dev_mem(
+      cmdbuf, desc, desc_count * PANVK_DESCRIPTOR_SIZE, PANVK_DESCRIPTOR_SIZE);
+   if (!driver_set.gpu)
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+   struct panvk_opaque_desc *descs = driver_set.cpu;
+   pan_cast_and_pack(&descs[0], SAMPLER, cfg) {
+      cfg.clamp_integer_array_indices = false;
+   }
+   panvk_per_arch(cmd_fill_dyn_bufs)(&cmdbuf->state.gfx.desc_state, info,
+      (struct mali_buffer_packed *)(&descs[1]));
    st->driver_set.dev_addr = driver_set.gpu;
    st->driver_set.size = desc_count * PANVK_DESCRIPTOR_SIZE;
    return VK_SUCCESS;
@@ -2337,7 +2371,8 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
 
       struct panvk_precomp_ctx pctx = panvk_per_arch(precomp_cs)(cmdbuf);
       panlib_v9_draw_indirect_patch(&pctx, panlib_1d(1),
-                                    PANLIB_BARRIER_JM_SUPPRESS_PREFETCH,
+                                    (enum panlib_barrier)(PANLIB_BARRIER_JM_BARRIER |
+                                    PANLIB_BARRIER_JM_SUPPRESS_PREFETCH),
                                     info->indirect.buffer_dev_addr, job.gpu,
                                     info->index.buffer_dev_addr, fv_ptr, bi_ptr,
                                     info->index.index_size);
@@ -2345,6 +2380,308 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
    }
    pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, false, false, 0,
                   indirect_dep, &job, false);
+   return VK_SUCCESS;
+}
+
+static int
+v9_tess_stage(void)
+{
+   static int v = -1;
+   if (v < 0) {
+      const char *e = getenv("PANVK_TESSSTAGE");
+      v = e ? atoi(e) : 7;
+      if (e)
+         dprintf(2, "[V9-TESS] stage limit %d\n", v);
+   }
+   return v;
+}
+
+static unsigned
+v9_launch_gfx_cs(struct panvk_cmd_buffer *cmdbuf,
+                 const struct panvk_shader_variant *cs,
+                 const struct panvk_shader_desc_state *desc,
+                 uint64_t push_uniforms, uint32_t x, uint32_t y, uint32_t z)
+{
+   struct panvk_batch *batch = cmdbuf->cur_batch;
+   struct pan_compute_dim dim = {.x = x, .y = y, .z = z};
+
+   if (!panvk_priv_mem_check_alloc(cs->spd))
+      return 0;
+
+   uint64_t tld =
+      panvk_per_arch(cmd_dispatch_prepare_tls)(cmdbuf, cs, &dim, false);
+   if (!tld)
+      return 0;
+
+   struct pan_ptr job = panvk_cmd_alloc_desc(cmdbuf, COMPUTE_JOB);
+   if (!job.gpu)
+      return 0;
+
+   pan_section_pack(job.cpu, COMPUTE_JOB, PAYLOAD, cfg) {
+      cfg.workgroup_size_x = cs->cs.local_size.x;
+      cfg.workgroup_size_y = cs->cs.local_size.y;
+      cfg.workgroup_size_z = cs->cs.local_size.z;
+      cfg.workgroup_count_x = x;
+      cfg.workgroup_count_y = y;
+      cfg.workgroup_count_z = z;
+      cfg.task_increment = 1;
+      cfg.task_axis = MALI_TASK_AXIS_Z;
+      cfg.compute.resources = desc->res_table;
+      cfg.compute.shader = panvk_priv_mem_dev_addr(cs->spd);
+      cfg.compute.thread_storage = tld;
+      cfg.compute.fau = push_uniforms;
+      cfg.compute.fau_count = cs->fau.total_count;
+   }
+   util_dynarray_append(&batch->jobs, job.cpu);
+
+   /* Barrier: libpoly stages are producer/consumer chained. */
+   return pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_COMPUTE, true, false,
+                         0, 0, &job, false);
+}
+
+static void
+v9_launch_tessellator(struct panvk_cmd_buffer *cmdbuf, uint32_t patch_count,
+                      enum tess_primitive_mode mode, uint64_t params,
+                      enum poly_tess_mode tess_mode)
+{
+   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+   struct panlib_precomp_grid grid = panlib_1d(DIV_ROUND_UP(patch_count, 64));
+
+   switch (mode) {
+   case TESS_PRIMITIVE_ISOLINES:
+      panlib_tess_isoline(&ctx, grid, PANLIB_BARRIER_JM_BARRIER, params,
+                          tess_mode);
+      break;
+   case TESS_PRIMITIVE_TRIANGLES:
+      panlib_tess_tri(&ctx, grid, PANLIB_BARRIER_JM_BARRIER, params, tess_mode);
+      break;
+   case TESS_PRIMITIVE_QUADS:
+      panlib_tess_quad(&ctx, grid, PANLIB_BARRIER_JM_BARRIER, params, tess_mode);
+      break;
+   default:
+      UNREACHABLE("invalid tessellation primitive mode");
+   }
+}
+
+static VkResult
+v9_launch_tess(struct panvk_cmd_buffer *cmdbuf,
+               const struct panvk_draw_info *in,
+               struct panvk_draw_info *out,
+               const struct panvk_shader_variant *fs)
+{
+   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+   struct panvk_cmd_graphics_state *gfx = &cmdbuf->state.gfx;
+   const struct panvk_shader *input_vs = gfx->tess.input_vs;
+   const struct panvk_shader *tcs = gfx->tess.tcs;
+   const struct panvk_shader *tes = gfx->tess.tes;
+   const struct vk_dynamic_graphics_state *dyn =
+      &cmdbuf->vk.dynamic_graphics_state;
+   struct panvk_batch *batch = cmdbuf->cur_batch;
+   VkResult result;
+
+   if (!input_vs || !tcs || !tes || in->indirect.buffer_dev_addr)
+      return VK_ERROR_FEATURE_NOT_PRESENT;
+
+   const struct panvk_shader_variant *sw_vs = panvk_shader_sw_variant(input_vs);
+   const struct panvk_shader_variant *tcs_v = panvk_shader_only_variant(tcs);
+   if (!panvk_priv_mem_check_alloc(sw_vs->spd) ||
+       !panvk_priv_mem_check_alloc(tcs_v->spd))
+      return VK_ERROR_FEATURE_NOT_PRESENT;
+
+   const uint32_t input_patch_size = dyn->ts.patch_control_points;
+   if (!input_patch_size || !tcs->tess.tcs_output_patch_size)
+      return VK_ERROR_UNKNOWN;
+
+   const uint32_t patches_per_instance = in->vertex.count / input_patch_size;
+   const uint32_t patch_count = patches_per_instance * in->instance.count;
+   if (!patch_count) {
+      *out = *in;
+      out->vertex.count = 0;
+      return VK_SUCCESS;
+   }
+
+   /* Reset the device-global libpoly bump heap once per batch.  Batches are
+    * serialized on the queue, so the previous batch is done with it. */
+   if (v9_tess_stage() >= 1 && !batch->poly_heap_reset) {
+      struct pan_ptr wj = panvk_cmd_alloc_desc(cmdbuf, WRITE_VALUE_JOB);
+      if (!wj.gpu)
+         return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+      pan_section_pack(wj.cpu, WRITE_VALUE_JOB, PAYLOAD, p) {
+         p.type = MALI_WRITE_VALUE_TYPE_IMMEDIATE_32;
+         p.address = dev->poly_heap->addr.dev + offsetof(struct poly_heap, bottom);
+         p.immediate_value = 0;
+      }
+      util_dynarray_append(&batch->jobs, wj.cpu);
+      pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_WRITE_VALUE, true, false,
+                     0, 0, &wj, false);
+      batch->poly_heap_reset = true;
+   }
+
+   const uint32_t vs_wg_size[3] = {1, 1, 1};
+   struct poly_vertex_params vertex_params;
+   poly_vertex_params_init(&vertex_params, input_vs->tess.vs_outputs,
+                           vs_wg_size);
+   poly_vertex_params_set_draw(&vertex_params, in->vertex.count,
+                               in->instance.count);
+
+   if (in->index.index_size) {
+      /* JM: index.offset is already in bytes. */
+      const uint64_t index_offs = in->index.offset;
+      vertex_params.index_buffer = in->index.buffer_dev_addr + index_offs;
+      vertex_params.index_size_B = in->index.index_size;
+      vertex_params.index_buffer_range_el =
+         index_offs < in->index.buffer_size
+            ? (in->index.buffer_size - index_offs) / in->index.index_size
+            : 0;
+   }
+
+   const uint64_t vs_output_size = poly_tcs_in_size(
+      in->vertex.count * in->instance.count, input_vs->tess.vs_outputs);
+   struct pan_ptr vs_output = panvk_cmd_alloc_dev_mem(
+      cmdbuf, desc, MAX2(vs_output_size, 16), 16);
+   if (!vs_output.gpu)
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+   vertex_params.output_buffer = vs_output.gpu;
+
+   struct pan_ptr vertex_params_ptr = panvk_cmd_upload_dev_mem(
+      cmdbuf, desc, &vertex_params, sizeof(vertex_params), 8);
+   if (!vertex_params_ptr.gpu)
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+   struct panvk_tess_info info =
+      panvk_tess_info_merge(tcs->tess.info, tes->tess.info);
+   enum poly_tess_partitioning partitioning =
+      info.spacing == TESS_SPACING_EQUAL
+         ? POLY_TESS_PARTITIONING_INTEGER
+      : info.spacing == TESS_SPACING_FRACTIONAL_ODD
+         ? POLY_TESS_PARTITIONING_FRACTIONAL_ODD
+         : POLY_TESS_PARTITIONING_FRACTIONAL_EVEN;
+
+   struct poly_tess_params tess_params = {
+      .heap = dev->poly_heap->addr.dev,
+      .patch_coord_buffer = dev->poly_heap->addr.dev + sizeof(struct poly_heap),
+      .tcs_stride_el = tcs->tess.tcs_output_stride / 4,
+      .input_patch_size = input_patch_size,
+      .output_patch_size = tcs->tess.tcs_output_patch_size,
+      .tcs_patch_constants = tcs->tess.tcs_nr_patch_outputs,
+      .tcs_per_vertex_outputs = tcs->tess.tcs_per_vertex_outputs,
+      .patches_per_instance = patches_per_instance,
+      .nr_patches = patch_count,
+      .partitioning = partitioning,
+      .points_mode = info.points,
+      .isolines = info.mode == TESS_PRIMITIVE_ISOLINES,
+   };
+
+   if (!tess_params.points_mode && info.mode != TESS_PRIMITIVE_ISOLINES) {
+      tess_params.ccw = info.ccw;
+      tess_params.ccw ^=
+         dyn->ts.domain_origin == VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT;
+   }
+
+   uint64_t alloc = 0;
+   const uint64_t tcs_out_offs = alloc;
+   alloc += (uint64_t)patch_count * tess_params.tcs_stride_el * 4;
+   const uint64_t coord_allocs_offs = alloc;
+   alloc += (uint64_t)patch_count * sizeof(uint32_t);
+   const uint64_t counts_offs = alloc;
+   alloc += (uint64_t)patch_count * sizeof(uint32_t);
+   const uint64_t draw_offs = alloc;
+   alloc += sizeof(VkDrawIndexedIndirectCommand);
+
+   struct pan_ptr tess_storage = panvk_cmd_alloc_dev_mem(cmdbuf, desc, alloc, 16);
+   if (!tess_storage.gpu)
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+   tess_params.tcs_buffer = tess_storage.gpu + tcs_out_offs;
+   tess_params.coord_allocs = tess_storage.gpu + coord_allocs_offs;
+   tess_params.counts = tess_storage.gpu + counts_offs;
+   tess_params.out_draws = tess_storage.gpu + draw_offs;
+
+   struct pan_ptr tess_params_ptr = panvk_cmd_upload_dev_mem(
+      cmdbuf, desc, &tess_params, sizeof(tess_params), 8);
+   if (!tess_params_ptr.gpu)
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+   /* API draw sysvals for the compute-lowered VS, then libpoly pointers. */
+   panvk_per_arch(cmd_prepare_draw_sysvals)(cmdbuf, in, fs);
+   gfx->sysvals.common.vertex_param_buffer_poly = vertex_params_ptr.gpu;
+   gfx->sysvals.common.tess_param_buffer_poly = tess_params_ptr.gpu;
+
+   /* Descriptors for the VS-as-compute and TCS-as-compute stages. */
+   uint32_t used = input_vs->desc_info.used_set_mask |
+                   tcs->desc_info.used_set_mask |
+                   tes->desc_info.used_set_mask;
+   if (fs)
+      used |= gfx->fs.shader->desc_info.used_set_mask;
+   result = panvk_per_arch(cmd_prepare_push_descs)(cmdbuf, &gfx->desc_state, used);
+   if (result != VK_SUCCESS)
+      return result;
+   result = v9_prepare_vs_driver_set_ex(cmdbuf, input_vs, &gfx->tess.vs_desc,
+                                        in->instance.base);
+   if (result != VK_SUCCESS)
+      return result;
+   result = panvk_per_arch(cmd_prepare_shader_res_table)(
+      cmdbuf, &gfx->desc_state, &input_vs->desc_info, &gfx->tess.vs_desc, 1);
+   if (result != VK_SUCCESS)
+      return result;
+   result = v9_prepare_tess_compute_driver_set(cmdbuf, tcs, &gfx->tess.tcs_desc);
+   if (result != VK_SUCCESS)
+      return result;
+   result = panvk_per_arch(cmd_prepare_shader_res_table)(
+      cmdbuf, &gfx->desc_state, &tcs->desc_info, &gfx->tess.tcs_desc, 1);
+   if (result != VK_SUCCESS)
+      return result;
+
+   struct pan_ptr push;
+   result = panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, sw_vs, &push, 1);
+   if (result != VK_SUCCESS)
+      return result;
+   gfx->tess.vs_push_uniforms = push.gpu;
+   result = panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, tcs_v, &push, 1);
+   if (result != VK_SUCCESS)
+      return result;
+   gfx->tess.tcs_push_uniforms = push.gpu;
+
+   if (v9_tess_stage() >= 2 && !v9_launch_gfx_cs(cmdbuf, sw_vs, &gfx->tess.vs_desc,
+                         gfx->tess.vs_push_uniforms, in->vertex.count,
+                         in->instance.count, 1))
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+   if (v9_tess_stage() >= 3 && !v9_launch_gfx_cs(cmdbuf, tcs_v, &gfx->tess.tcs_desc,
+                         gfx->tess.tcs_push_uniforms, patches_per_instance,
+                         in->instance.count, 1))
+      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+   if (v9_tess_stage() >= 4)
+   v9_launch_tessellator(cmdbuf, patch_count, info.mode, tess_params_ptr.gpu,
+                         POLY_TESS_MODE_COUNT);
+   struct panvk_precomp_ctx pctx = panvk_per_arch(precomp_cs)(cmdbuf);
+   if (v9_tess_stage() >= 5)
+   panlib_prefix_sum_tess_serial(&pctx, panlib_1d(1), PANLIB_BARRIER_JM_BARRIER,
+                          tess_params_ptr.gpu);
+   if (v9_tess_stage() >= 6)
+   v9_launch_tessellator(cmdbuf, patch_count, info.mode, tess_params_ptr.gpu,
+                         POLY_TESS_MODE_WITH_COUNTS);
+
+   gfx->tess.info = info;
+   gfx->tess.prim = info.points ? MESA_PRIM_POINTS
+                    : info.mode == TESS_PRIMITIVE_ISOLINES ? MESA_PRIM_LINES
+                                                           : MESA_PRIM_TRIANGLES;
+
+   *out = (struct panvk_draw_info){
+      .index = {
+         .buffer_dev_addr = dev->poly_heap->addr.dev + sizeof(struct poly_heap),
+         .buffer_size = pan_kmod_bo_size(dev->poly_heap->bo) -
+                        sizeof(struct poly_heap),
+         .index_size = 4,
+      },
+      .vertex.count = 1,
+      .instance.count = 1,
+      .indirect = {
+         .buffer_dev_addr = tess_params.out_draws,
+         .draw_count = 1,
+         .stride = sizeof(VkDrawIndexedIndirectCommand),
+      },
+      .prim = gfx->tess.prim,
+   };
    return VK_SUCCESS;
 }
 
@@ -2360,16 +2697,6 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (!vs || !panvk_priv_mem_check_alloc(vs->spds.pos_triangles))
       return;
 
-   /* v48: tessellation shaders compile on v9, but the JM tessellation
-    * dispatch (VS/TCS as compute + libpoly tessellator) isn't wired yet.
-    * Skip instead of feeding patches to the hardware. */
-   if (cmdbuf->state.gfx.tess.tes) {
-      static int tl = 0;
-      if (tl++ < 3)
-         dprintf(2, "[V9-TESS] skip tess draw (not implemented yet) tcs=%p tes=%p\n",
-                 (void *)cmdbuf->state.gfx.tess.tcs, (void *)cmdbuf->state.gfx.tess.tes);
-      return;
-   }
 
    cmdbuf->state.gfx.fs.required =
       fs_required(&cmdbuf->state.gfx, &cmdbuf->vk.dynamic_graphics_state);
@@ -2401,6 +2728,23 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    PANVK_TRACE_PRINTF( "[V9-DRAW] tiler_context result=%d", result);
    if (result != VK_SUCCESS)
       return;
+
+   if (cmdbuf->state.gfx.tess.tes) {
+      struct panvk_draw_info tess_draw;
+      VkResult tr = v9_launch_tess(cmdbuf, info, &tess_draw, fs);
+      static int tl = 0;
+      if (tl++ < 5)
+         dprintf(2, "[V9-TESS] launch result=%d verts=%u inst=%u patch_cp=%u\n",
+                 tr, info->vertex.count, info->instance.count,
+                 cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points);
+      if (tr != VK_SUCCESS ||
+          (!tess_draw.vertex.count && !tess_draw.indirect.buffer_dev_addr))
+         return;
+      if (v9_tess_stage() < 7)
+         return;
+      *info = tess_draw;
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+   }
 
    struct panvk_descriptor_state *desc_state = &cmdbuf->state.gfx.desc_state;
    const struct panvk_shader_desc_info *vs_info = &cmdbuf->state.gfx.vs.shader->desc_info;
@@ -2461,6 +2805,8 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (result != VK_SUCCESS)
       return;
    clear_dirty_after_draw(cmdbuf);
+   if (info->indirect.buffer_dev_addr)
+      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
 }
 
 VKAPI_ATTR void VKAPI_CALL

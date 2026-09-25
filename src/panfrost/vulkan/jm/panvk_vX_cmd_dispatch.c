@@ -45,7 +45,7 @@ panvk_per_arch(cmd_dispatch_prepare_tls)(
    panvk_per_arch(cmd_alloc_tls_desc)(cmdbuf, false);
 
    batch->tlsinfo.tls.size = MAX2(cs->info.tls_size, batch->tlsinfo.tls.size);
-   batch->tlsinfo.wls.size = cs->info.wls_size;
+   batch->tlsinfo.wls.size = MAX2(cs->info.wls_size, batch->tlsinfo.wls.size);
 
    if (batch->tlsinfo.wls.size) {
       unsigned core_id_range =
