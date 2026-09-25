@@ -2438,6 +2438,27 @@ kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_r
    return slot->atom_number;
 }
 
+/* v50d: drop our interest in an atom without waiting for it. If it already
+ * completed the slot is freed now, otherwise at its completion event. */
+void
+kbase_kmod_atom_release(struct pan_kmod_dev *dev, uint64_t atom_num)
+{
+   struct kbase_kmod_dev *kd = container_of(dev, struct kbase_kmod_dev, base);
+   if (!atom_num)
+      return;
+   simple_mtx_lock(&kd->atoms_lock);
+   for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
+      if (kd->atoms[i].atom_number != atom_num)
+         continue;
+      if (kd->atoms[i].waiters > 0)
+         kd->atoms[i].waiters--;
+      if (kd->atoms[i].waiters == 0 && kd->atoms[i].completed)
+         kd->atoms[i].atom_number = 0;
+      break;
+   }
+   simple_mtx_unlock(&kd->atoms_lock);
+}
+
 /* Submit `jc` and block until it completes, retrying with backoff if the
  * kernel reports it as TERMINATED. Used only for the very first job submitted
  * on a queue: the kbase job-slot watchdog can spuriously terminate it before

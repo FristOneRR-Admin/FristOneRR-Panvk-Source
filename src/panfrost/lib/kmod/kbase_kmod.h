@@ -46,6 +46,7 @@ bool kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc, uint32_t
 /* Submit with up to two kbase pre-dependencies (0 = none). If no_waiter is
  * set, nobody will kbase_kmod_wait_atom() on it and its slot is recycled as
  * soon as its completion event is processed. */
+void kbase_kmod_atom_release(struct pan_kmod_dev *dev, uint64_t atom_num);
 uint64_t kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_req,
                                    struct pan_kmod_bo **bos, uint32_t nbo,
                                    uint64_t dep0, uint8_t dep0_type,

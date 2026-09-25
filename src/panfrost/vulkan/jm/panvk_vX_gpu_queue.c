@@ -403,9 +403,10 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
                 * ever waits for that fragment job), wait for it
                 * synchronously right here, same trick already used for
                 * vtc_atom above. */
-               ASSERTED bool done =
-                  P4_WAIT(dev->kmod.dev, last_atom, -1);
-               assert(done);
+               /* v50c: atoms are fully ordered on this queue, the newest one covers
+                * all earlier ones -- no CPU wait on the submit path. */
+               kbase_kmod_atom_release(dev->kmod.dev, targets[PANVK_KBASE_SYNC_TARGET_COUNT - 1]);
+               targets[PANVK_KBASE_SYNC_TARGET_COUNT - 1] = last_atom;
             }
          }
 
