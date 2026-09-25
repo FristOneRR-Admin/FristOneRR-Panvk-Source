@@ -23,7 +23,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef PANVK_TRACE_BUILD
 static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const char *e = getenv("PANVK_TRACE"); v = (e && e[0] == '1'); } return v; }
+#else
+#define panvk_trace_on_() 0
+#endif
 #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
 
 struct panvk_blend_shader_key {

@@ -1381,12 +1381,6 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
       dma_heap = "/dev/dma_heap/system";
 
    kbase_dev->dma_heap_fd = open(dma_heap, O_RDWR | O_CLOEXEC);
-   /* Android exposes dma-heaps read-only to apps (cr--r--r--); the
-    * DMA_HEAP_IOCTL_ALLOC ioctl works fine on an O_RDONLY fd. */
-   if (kbase_dev->dma_heap_fd < 0)
-      kbase_dev->dma_heap_fd = open(dma_heap, O_RDONLY | O_CLOEXEC);
-   dprintf(2, "[DMAHEAP] %s -> fd=%d%s\n", dma_heap, kbase_dev->dma_heap_fd,
-           kbase_dev->dma_heap_fd < 0 ? " (unavailable)" : "");
    if (kbase_dev->dma_heap_fd < 0)
       mesa_logd("kbase: dma-heap unavailable at %s: %s", dma_heap,
                 strerror(errno));
@@ -1528,88 +1522,6 @@ to_kbase_mem_flags(uint32_t kmod_flags)
    }
 
    return flags;
-}
-
-#ifndef BASE_MEM_IMPORT_TYPE_USER_BUFFER
-#define BASE_MEM_IMPORT_TYPE_USER_BUFFER 3
-#endif
-
-struct pan_kmod_bo *kbase_kmod_bo_import_host(struct pan_kmod_dev *dev,
-                                              void *host_ptr, uint64_t size);
-
-/* VK_EXT_external_memory_host: import user memory (e.g. Wine WoW64 memory
- * below 4GiB) into the GPU with KBASE_IOCTL_MEM_IMPORT/USER_BUFFER. */
-struct pan_kmod_bo *
-kbase_kmod_bo_import_host(struct pan_kmod_dev *dev, void *host_ptr,
-                          uint64_t size)
-{
-   struct kbase_kmod_dev *kbase_dev =
-      container_of(dev, struct kbase_kmod_dev, base);
-   const uint64_t page_size = 4096;
-   static int imp_logs;
-
-   struct kbase_kmod_bo *kbase_bo = pan_kmod_dev_alloc(dev, sizeof(*kbase_bo));
-   if (!kbase_bo)
-      return NULL;
-   memset(kbase_bo, 0, sizeof(*kbase_bo));
-   kbase_bo->dmabuf_fd = -1;
-
-   struct {
-      uint64_t ptr;
-      uint64_t length;
-   } user_buf = { (uintptr_t)host_ptr, size };
-
-   union kbase_ioctl_mem_import req = {
-      .in = {
-         .flags = BASE_MEM_PROT_CPU_RD | BASE_MEM_PROT_CPU_WR |
-                  BASE_MEM_PROT_GPU_RD | BASE_MEM_PROT_GPU_WR,
-         .phandle = (uintptr_t)&user_buf,
-         .type = BASE_MEM_IMPORT_TYPE_USER_BUFFER,
-      },
-   };
-
-   if (ioctl(dev->fd, KBASE_IOCTL_MEM_IMPORT, &req)) {
-      if (imp_logs++ < 20)
-         dprintf(2, "[HOSTIMP] import ptr=%p size=%llu FAILED: %s\n", host_ptr,
-                 (unsigned long long)size, strerror(errno));
-      pan_kmod_dev_free(dev, kbase_bo);
-      return NULL;
-   }
-
-   const uint64_t bo_size = req.out.va_pages * page_size;
-   kbase_bo->same_va =
-      (req.out.flags & (BASE_MEM_SAME_VA | BASE_MEM_NEED_MMAP)) != 0;
-
-   if (kbase_bo->same_va) {
-      kbase_bo->gpu_mapping = mmap(NULL, bo_size, PROT_READ | PROT_WRITE,
-                                   MAP_SHARED, dev->fd, req.out.gpu_va);
-      if (kbase_bo->gpu_mapping == MAP_FAILED) {
-         if (imp_logs++ < 20)
-            dprintf(2, "[HOSTIMP] gpu mmap FAILED: %s\n", strerror(errno));
-         kbase_bo->gpu_mapping = NULL;
-         struct kbase_ioctl_mem_free free_req = { .gpu_addr = req.out.gpu_va };
-         ioctl(dev->fd, KBASE_IOCTL_MEM_FREE, &free_req);
-         pan_kmod_dev_free(dev, kbase_bo);
-         return NULL;
-      }
-      kbase_bo->gpu_va = (uintptr_t)kbase_bo->gpu_mapping;
-   } else {
-      kbase_bo->gpu_mapping = NULL;
-      kbase_bo->gpu_va = req.out.gpu_va;
-   }
-
-   kbase_bo->cpu_ptr = host_ptr;
-   kbase_bo->owns_cpu_mapping = false;
-
-   if (imp_logs++ < 20)
-      dprintf(2, "[HOSTIMP] ok ptr=%p size=%llu gpu_va=0x%llx same_va=%d\n",
-              host_ptr, (unsigned long long)bo_size,
-              (unsigned long long)kbase_bo->gpu_va, (int)kbase_bo->same_va);
-
-   uint32_t handle = p_atomic_inc_return(&kbase_dev->next_handle);
-   pan_kmod_bo_init(&kbase_bo->base, dev, NULL, bo_size,
-                    PAN_KMOD_BO_FLAG_IMPORTED, handle);
-   return &kbase_bo->base;
 }
 
 static struct pan_kmod_bo *

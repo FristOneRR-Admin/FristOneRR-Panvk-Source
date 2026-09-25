@@ -83,9 +83,6 @@ panvk_per_arch(dispatch_precomp)(struct panvk_precomp_ctx *ctx,
       cfg.workgroup_count_x = grid.count[0];
       cfg.workgroup_count_y = grid.count[1];
       cfg.workgroup_count_z = grid.count[2];
-      /* Same as panfrost (Valhall JM). */
-      cfg.task_increment = 1;
-      cfg.task_axis = MALI_TASK_AXIS_Z;
       cfg.compute.shader = panvk_priv_mem_dev_addr(shader->spd);
       cfg.compute.thread_storage = tld;
       cfg.compute.fau = push_uniforms.gpu;

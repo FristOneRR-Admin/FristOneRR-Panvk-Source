@@ -2538,17 +2538,6 @@ panvk_GetPhysicalDeviceExternalBufferProperties(
    VkExternalBufferProperties *pExternalBufferProperties)
 {
    if (pExternalBufferInfo->handleType ==
-       VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT) {
-      pExternalBufferProperties->externalMemoryProperties = (VkExternalMemoryProperties){
-         .externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
-         .exportFromImportedHandleTypes = 0,
-         .compatibleHandleTypes =
-            VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
-      };
-      return;
-   }
-
-   if (pExternalBufferInfo->handleType ==
        VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) {
       vk_android_get_ahb_buffer_properties(physicalDevice, pExternalBufferInfo,
                                            pExternalBufferProperties);

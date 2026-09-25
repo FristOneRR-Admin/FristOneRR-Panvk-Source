@@ -216,9 +216,6 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
       cfg.workgroup_count_x = wg_count.x;
       cfg.workgroup_count_y = wg_count.y;
       cfg.workgroup_count_z = wg_count.z;
-      /* Same as panfrost (Valhall JM). */
-      cfg.task_increment = 1;
-      cfg.task_axis = MALI_TASK_AXIS_Z;
       cfg.compute.resources = cs_desc_state->res_table;
       cfg.compute.shader = panvk_priv_mem_dev_addr(cs->spd);
       cfg.compute.thread_storage = tsd;

@@ -431,9 +431,16 @@ pan_build_varying_layout_compact(struct pan_varying_layout *layout,
          unsigned bit_size = nir_alu_type_get_type_size(slot->alu_type);
 
          unsigned size = slot->ncomps * (bit_size / 8);
-         unsigned alignment = util_next_power_of_two(size);
-         unsigned offset = align(generic_size_B, alignment);
-         generic_size_B = offset + size;
+         /* Location-stable layout: a varying's offset depends only on its
+          * location, so a VS and an FS compiled separately (FS reading only a
+          * subset of the VS outputs) always agree on where each varying lives.
+          * VARn -> n*16; other generic slots go after the 32 VARn slots. */
+         unsigned loc = slot->location;
+         unsigned idx = loc >= VARYING_SLOT_VAR0 ? (loc - VARYING_SLOT_VAR0)
+                                                 : (32 + loc);
+         unsigned offset = idx * 16;
+         assert(size <= 16);
+         generic_size_B = MAX2(generic_size_B, offset + size);
 
          assert(slot->offset == -1);
          assert(offset < 4096);

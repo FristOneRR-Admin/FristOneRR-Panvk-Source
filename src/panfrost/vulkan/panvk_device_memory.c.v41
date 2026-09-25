@@ -12,10 +12,6 @@
 #include "panvk_device_memory.h"
 #include "panvk_entrypoints.h"
 
-/* kbase backend: VK_EXT_external_memory_host import */
-struct pan_kmod_bo *kbase_kmod_bo_import_host(struct pan_kmod_dev *dev,
-                                              void *host_ptr, uint64_t size);
-
 #include "pan_props.h"
 
 #include "util/u_atomic.h"
@@ -109,20 +105,7 @@ panvk_AllocateMemory(VkDevice _device,
    if (fd_info && !fd_info->handleType)
       fd_info = NULL;
 
-   const VkImportMemoryHostPointerInfoEXT *host_info = vk_find_struct_const(
-      pAllocateInfo->pNext, IMPORT_MEMORY_HOST_POINTER_INFO_EXT);
-   if (host_info && !host_info->handleType)
-      host_info = NULL;
-
-   if (host_info) {
-      mem->bo = kbase_kmod_bo_import_host(device->kmod.dev,
-                                          (void *)host_info->pHostPointer,
-                                          pAllocateInfo->allocationSize);
-      if (!mem->bo) {
-         result = panvk_error(device, VK_ERROR_INVALID_EXTERNAL_HANDLE);
-         goto err_destroy_mem;
-      }
-   } else if (fd_info) {
+   if (fd_info) {
       assert(
          fd_info->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT ||
          fd_info->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT);
@@ -544,34 +527,4 @@ panvk_GetDeviceMemoryOpaqueCaptureAddress(
    VK_FROM_HANDLE(panvk_device_memory, memory, pInfo->memory);
 
    return memory->addr.dev;
-}
-
-
-VKAPI_ATTR VkResult VKAPI_CALL
-panvk_GetMemoryHostPointerPropertiesEXT(
-   VkDevice _device, VkExternalMemoryHandleTypeFlagBits handleType,
-   const void *pHostPointer,
-   VkMemoryHostPointerPropertiesEXT *pMemoryHostPointerProperties)
-{
-   VK_FROM_HANDLE(panvk_device, device, _device);
-
-   if (handleType != VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT)
-      return panvk_error(device, VK_ERROR_INVALID_EXTERNAL_HANDLE);
-
-   struct panvk_physical_device *pdev =
-      to_panvk_physical_device(device->vk.physical);
-   VkPhysicalDeviceMemoryProperties2 props = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
-   };
-   panvk_GetPhysicalDeviceMemoryProperties2(
-      panvk_physical_device_to_handle(pdev), &props);
-
-   uint32_t bits = 0;
-   for (uint32_t i = 0; i < props.memoryProperties.memoryTypeCount; i++) {
-      if (props.memoryProperties.memoryTypes[i].propertyFlags &
-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-         bits |= 1u << i;
-   }
-   pMemoryHostPointerProperties->memoryTypeBits = bits;
-   return VK_SUCCESS;
 }

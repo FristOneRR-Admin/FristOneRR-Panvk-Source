@@ -195,7 +195,6 @@ panvk_per_arch(get_physical_device_extensions)(
       .EXT_line_rasterization = true,
       .EXT_load_store_op_none = true,
       .EXT_map_memory_placed = true,
-      .EXT_external_memory_host = true,
       .EXT_nested_command_buffer = PAN_ARCH >= 10,
       .EXT_memory_budget = true,
       .EXT_non_seamless_cube_map = true,
@@ -1304,9 +1303,6 @@ panvk_per_arch(get_physical_device_properties)(
 
       /* VK_EXT_map_memory_placed */
       .minPlacedMemoryMapAlignment = os_page_size,
-
-      /* VK_EXT_external_memory_host */
-      .minImportedHostPointerAlignment = 4096,
 
       /* VK_EXT_provoking_vertex */
       .provokingVertexModePerPipeline = false,
