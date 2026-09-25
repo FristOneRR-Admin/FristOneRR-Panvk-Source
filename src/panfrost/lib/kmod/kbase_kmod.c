@@ -200,6 +200,9 @@ struct kbase_kmod_dev {
    uint32_t last_event_code[256];
    /* atom_number & 0xff -> last consumed completion of that atom errored */
    bool atom_failed[256];
+   /* v52e: per-context completion record (was process-global) */
+   uint64_t last_done_atom_ctx[256];
+   uint32_t last_done_code_ctx[256];
 };
 
 struct kbase_kmod_vm {
@@ -2213,6 +2216,9 @@ kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t n
    return NULL;
 }
 
+/* v52a fault report */
+static uint32_t g_atom_req[256];
+static int g_kfault_n;
 static void
 kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
                                 const struct base_jd_event_v2 *ev)
@@ -2222,13 +2228,17 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
          fprintf(stderr, "[K1] event atom=%u code=0x%x waiters=%u\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, (unsigned)kd->atoms[i].waiters);
          kd->atoms[i].completed = true;
          kd->atoms[i].errored = (ev->event_code != BASE_JD_EVENT_DONE);
-            kd->last_event_code[ev->atom_number & 0xff] = ev->event_code;
+         if (ev->event_code != BASE_JD_EVENT_DONE && g_kfault_n++ < 40)
+            dprintf(2, "[KFAULT] atom=%u code=0x%x core_req=0x%x\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, g_atom_req[ev->atom_number & 0xff]);
+         kd->last_event_code[ev->atom_number & 0xff] = ev->event_code;
          if (kd->atoms[i].waiters == 0)
             kd->atoms[i].atom_number = 0;
          return;
       }
    }
    fprintf(stderr, "[K1] event atom=%u code=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code);
+   if (ev->event_code != BASE_JD_EVENT_DONE && g_kfault_n++ < 40)
+      dprintf(2, "[KFAULT] atom=%u code=0x%x core_req=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, g_atom_req[ev->atom_number & 0xff]);
 }
 
 
@@ -2271,8 +2281,11 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          present = true;
          if (kd->atoms[i].completed) {
             bool ok = !kd->atoms[i].errored;
-            if (!ok)
+            if (!ok) {
                kd->atom_failed[atom_num & 0xff] = true;
+               if (g_kfault_n++ < 40)
+                  dprintf(2, "[KWAITFAIL] atom=%lu errored\n", (unsigned long)atom_num);
+            }
             if (kd->atoms[i].waiters > 0 && --kd->atoms[i].waiters == 0)
                kd->atoms[i].atom_number = 0;
             simple_mtx_unlock(&kd->atoms_lock);
@@ -2284,10 +2297,13 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
          bool bad = kd->atom_failed[atom_num & 0xff];
          uint32_t code = kd->last_event_code[atom_num & 0xff];
          simple_mtx_unlock(&kd->atoms_lock);
-         if (bad)
+         if (bad) {
+            if (g_kfault_n++ < 40)
+               dprintf(2, "[KWAITFAIL] atom=%lu stale-failed code=0x%x\n", (unsigned long)atom_num, code);
             return false;
-         if (g_last_done_atom[atom_num & 0xff] == atom_num &&
-             g_last_done_code[atom_num & 0xff] == BASE_JD_EVENT_DONE)
+         }
+         if (kd->last_done_atom_ctx[atom_num & 0xff] == atom_num &&
+             kd->last_done_code_ctx[atom_num & 0xff] == BASE_JD_EVENT_DONE)
             return true;
       } else {
          simple_mtx_unlock(&kd->atoms_lock);
@@ -2333,8 +2349,8 @@ kbase_wait_atom(struct kbase_kmod_dev *kd, uint64_t atom_num, int64_t timeout_ns
       if (n == (ssize_t)sizeof(ev)) {
          simple_mtx_lock(&kd->atoms_lock);
          kbase_atom_process_event_locked(kd, &ev);
-         g_last_done_atom[ev.atom_number & 0xff] = ev.atom_number;
-         g_last_done_code[ev.atom_number & 0xff] = ev.event_code;
+         kd->last_done_atom_ctx[ev.atom_number & 0xff] = ev.atom_number;
+         kd->last_done_code_ctx[ev.atom_number & 0xff] = ev.event_code;
          simple_mtx_unlock(&kd->atoms_lock);
       }
    }
@@ -2421,6 +2437,7 @@ kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_r
       atom.pre_dep[i].dependency_type = use ? types[i] : 0;
    }
 
+   g_atom_req[atom.atom_number] = core_req;
    struct kbase_ioctl_job_submit sub = {
       .addr = (uint64_t)(uintptr_t)&atom,
       .nr_atoms = 1,
