@@ -2360,6 +2360,17 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (!vs || !panvk_priv_mem_check_alloc(vs->spds.pos_triangles))
       return;
 
+   /* v48: tessellation shaders compile on v9, but the JM tessellation
+    * dispatch (VS/TCS as compute + libpoly tessellator) isn't wired yet.
+    * Skip instead of feeding patches to the hardware. */
+   if (cmdbuf->state.gfx.tess.tes) {
+      static int tl = 0;
+      if (tl++ < 3)
+         dprintf(2, "[V9-TESS] skip tess draw (not implemented yet) tcs=%p tes=%p\n",
+                 (void *)cmdbuf->state.gfx.tess.tcs, (void *)cmdbuf->state.gfx.tess.tes);
+      return;
+   }
+
    cmdbuf->state.gfx.fs.required =
       fs_required(&cmdbuf->state.gfx, &cmdbuf->vk.dynamic_graphics_state);
    const struct panvk_shader_variant *fs = panvk_shader_only_variant(get_fs(cmdbuf));

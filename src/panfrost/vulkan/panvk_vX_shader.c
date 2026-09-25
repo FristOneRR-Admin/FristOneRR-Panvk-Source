@@ -1486,7 +1486,7 @@ panvk_compile_shader(struct panvk_device *dev,
             continue;
 
          if (v == PANVK_VS_VARIANT_SW &&
-             (PAN_ARCH < 10 ||
+             (PAN_ARCH < 9 ||
               !(info->next_stage_mask &
                 VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)))
             continue;

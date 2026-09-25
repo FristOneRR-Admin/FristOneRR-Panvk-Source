@@ -322,7 +322,7 @@ panvk_per_arch(get_physical_device_features)(
       .imageCubeArray = true,
       .independentBlend = true,
       .geometryShader = PANVK_DXVK_COMPAT_ON(),
-      .tessellationShader = PAN_ARCH >= 10,
+      .tessellationShader = PAN_ARCH >= 9,
       .sampleRateShading = true,
       .dualSrcBlend = true,
       .logicOp = true,
