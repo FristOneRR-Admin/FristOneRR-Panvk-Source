@@ -397,3 +397,13 @@ vk_icdGetInstanceProcAddr(VkInstance instance, const char *pName)
 {
    return panvk_GetInstanceProcAddr(instance, pName);
 }
+
+/* v54a: defaults for Winlator / DXVK users, so no env vars are needed.
+ * setenv(..., 0) never overrides a value the user set explicitly. */
+#include <stdlib.h>
+__attribute__((constructor)) static void
+panvk_default_env(void)
+{
+   setenv("PAN_I_WANT_A_BROKEN_VULKAN_DRIVER", "1", 0);
+   setenv("PANVK_DXVK_COMPAT", "1", 0);
+}
