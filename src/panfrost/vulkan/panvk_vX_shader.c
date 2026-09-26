@@ -1148,7 +1148,7 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
       free(data);
 
       shader->asm_str = asm_str;
-      PANVK_TRACE_PRINTF( "[SHADERASM] ===== stage=%d bin_size=%u =====\n%s\n===== END ASM =====\n", nir->info.stage, shader->bin_size, asm_str ? asm_str : "(null)"); fflush(stderr);
+      PANVK_TRACE_PRINTF( "[SHADERASM] ===== stage=%d bin_size=%u =====\n%s\n===== END ASM =====\n", nir->info.stage, shader->bin_size, asm_str ? asm_str : "(null)");
    }
 
    /* Pad the total to the 64-bit-aligned FAU count; it's used to initialize the
@@ -1357,7 +1357,7 @@ panvk_shader_upload(struct panvk_device *dev,
          cfg.flush_to_zero_mode = shader_ftz_mode(shader);
       }
 
-      PANVK_TRACE_PRINTF( "[IDVSDEBUG] stage=%d secondary_enable=%d secondary_offset=%u bin_size=%u\n", shader->info.stage, shader->info.vs.secondary_enable, shader->info.vs.secondary_offset, shader->bin_size); fflush(stderr);
+      PANVK_TRACE_PRINTF( "[IDVSDEBUG] stage=%d secondary_enable=%d secondary_offset=%u bin_size=%u\n", shader->info.stage, shader->info.vs.secondary_enable, shader->info.vs.secondary_offset, shader->bin_size);
       if (shader->info.vs.secondary_enable) {
          shader->spds.var =
             panvk_pool_alloc_desc(&dev->mempools.rw, SHADER_PROGRAM);

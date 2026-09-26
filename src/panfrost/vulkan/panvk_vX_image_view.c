@@ -82,7 +82,6 @@ static VkResult
 prepare_tex_descs(struct panvk_image_view *view)
 {
    fprintf(stderr, "[FristOneRR1] prepare_tex_descs begin fmt=%d\n", view->vk.view_format);
-   fflush(stderr);
    /* Use a temporary pan_image_view so we can tweak it for texture
     * descriptor emission without changing the original definition.
     */
@@ -188,10 +187,9 @@ prepare_tex_descs(struct panvk_image_view *view)
          }
       } else {
          GENX(pan_sampled_texture_emit)(&pview, &view->descs.tex[0], &ptr);
-      { const uint8_t *td = (const uint8_t *)&view->descs.tex[0]; PANVK_TRACE_PRINTF( "[TEXDUMP] view=%p fmt=%d dim=%d w=%u h=%u payload_gpu=0x%llx bytes:", (void *)view, view->pview.format, view->pview.dim, view->vk.extent.width, view->vk.extent.height, (unsigned long long)ptr.gpu); for (int _i = 0; _i < 32; _i++) fprintf(stderr, " %02x", td[_i]); fprintf(stderr, "\n"); fflush(stderr); }
+      { const uint8_t *td = (const uint8_t *)&view->descs.tex[0]; PANVK_TRACE_PRINTF( "[TEXDUMP] view=%p fmt=%d dim=%d w=%u h=%u payload_gpu=0x%llx bytes:", (void *)view, view->pview.format, view->pview.dim, view->vk.extent.width, view->vk.extent.height, (unsigned long long)ptr.gpu); for (int _i = 0; _i < 32; _i++) fprintf(stderr, " %02x", td[_i]); fprintf(stderr, "\n"); }
       fprintf(stderr, "[FristOneRR1] skip PIXDUMP base=0x%llx\n",
               (unsigned long long)image->planes[0].plane.base);
-      fflush(stderr);
 #if PAN_ARCH >= 9
          if (has_storage) {
             struct pan_image_view spview = panvk_storage_pview(view, &pview);
@@ -346,7 +344,6 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
    fprintf(stderr, "[FristOneRR1] CreateImageView fmt=%d viewfmt=%d type=%d usage=0x%lx img=%p\n",
            pCreateInfo->format, image ? image->vk.format : -1,
            pCreateInfo->viewType, (unsigned long)(image ? image->vk.usage : 0), (void*)image);
-   fflush(stderr);
    if (image && (pCreateInfo->format == VK_FORMAT_R8_UNORM ||
                  image->vk.format == VK_FORMAT_R8_UNORM)) {
       uint32_t pitch = 0;
@@ -360,14 +357,12 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
               pitch, (unsigned long long)mod, (int)image->vk.tiling,
               (int)pCreateInfo->components.r, (int)pCreateInfo->components.g,
               (int)pCreateInfo->components.b, (int)pCreateInfo->components.a);
-      fflush(stderr);
    }
 
    view = vk_image_view_create(&device->vk, pCreateInfo,
                                pAllocator, sizeof(*view));
    if (view == NULL) {
       fprintf(stderr, "[FristOneRR1] CreateImageView view=NULL\n");
-      fflush(stderr);
       return panvk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
    }
 
@@ -482,7 +477,6 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
       if (result != VK_SUCCESS) {
          fprintf(stderr, "[FristOneRR1] prepare_tex_descs result=0x%x fmt=%d\n",
                  result, view->vk.view_format);
-         fflush(stderr);
          goto err_destroy_iview;
       }
    }

@@ -2246,7 +2246,6 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
            (int)secondary_shader, vary_slots,
            secondary_shader ? vary_stride + 16 : 16, vary_stride,
            (int)panvk_priv_mem_check_alloc(vs->spds.var));
-   fflush(stderr);
 
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, PRIMITIVE, cfg) {
       cfg.draw_mode = v9_translate_prim(info->prim);
@@ -2292,7 +2291,6 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
            (unsigned long long)(info->index.buffer_dev_addr + info->index.offset),
            info->vertex.count, info->vertex.base,
            (int)info->index.restart_enable);
-   fflush(stderr);
 
    static int tess_nocull = -1;
    if (tess_nocull < 0) {
@@ -2352,7 +2350,6 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
 
    PANVK_TRACE_PRINTF( "[VARYINGDEBUG] spds.var alloc=%d\n",
            panvk_priv_mem_check_alloc(vs->spds.var));
-   fflush(stderr);
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, VARYING, cfg) {
       if (panvk_priv_mem_check_alloc(vs->spds.var)) {
          cfg.resources = cmdbuf->state.gfx.vs.desc.res_table;

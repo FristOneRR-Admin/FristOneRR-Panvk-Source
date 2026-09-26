@@ -1047,7 +1047,6 @@ record_binding(struct lower_desc_ctx *ctx, unsigned set, unsigned binding,
    PANVK_TRACE_PRINTF( "[DESCDEBUG] record_binding: set=%u binding=%u "
            "type=%u -> used_set_mask now 0x%x\n",
            set, binding, binding_layout->type, ctx->desc_info.used_set_mask);
-   fflush(stderr);
 
    /* On valhall, we only record dynamic bindings, others are accessed directly
     * from the set. */

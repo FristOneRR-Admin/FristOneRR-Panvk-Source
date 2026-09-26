@@ -1225,12 +1225,10 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
    if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_CSF, &ver) == 0) {
       is_csf = true;
       PANVK_TRACE_PRINTF( "[TRACE] CSF handshake SUCCEEDED, ver=%d.%d\n", ver.major, ver.minor);
-      fflush(stderr);
    } else if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_JM, &ver) == 0) {
       is_csf = false;
       PANVK_TRACE_PRINTF( "[TRACE] JM handshake succeeded, ver=%d.%d\n", ver.major, ver.minor);
    fprintf(stderr, "PANVK-BUILD: androidfinal-fontatlas10.3 (Mesa 26.3.0-devel)\n");
-      fflush(stderr);
 
       if (ver.major < 11) {
          mesa_loge("kbase: legacy JM driver version %d.%d not supported "
@@ -1839,7 +1837,7 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
    kbase_bo->cpu_ptr = cpu_ptr;
    kbase_bo->gpu_mapping = cpu_ptr;
    kbase_bo->gpu_va = kbase_bo->same_va ? (uintptr_t)cpu_ptr : alloc_gpu_va;
-   PANVK_TRACE_PRINTF( "[TRACE] bo_alloc: size=%lu va_pages=%lu same_va=%d cpu_ptr=%p gpu_va=0x%lx\n", (unsigned long)size, (unsigned long)va_pages, kbase_bo->same_va, cpu_ptr, (unsigned long)kbase_bo->gpu_va); fflush(stderr);
+   PANVK_TRACE_PRINTF( "[TRACE] bo_alloc: size=%lu va_pages=%lu same_va=%d cpu_ptr=%p gpu_va=0x%lx\n", (unsigned long)size, (unsigned long)va_pages, kbase_bo->same_va, cpu_ptr, (unsigned long)kbase_bo->gpu_va);
 
    /* Allocate a unique u32 handle for the pan_kmod handle_to_bo table. */
    uint32_t handle = p_atomic_inc_return(&kbase_dev->next_handle);

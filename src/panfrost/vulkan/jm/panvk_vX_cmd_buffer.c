@@ -71,7 +71,6 @@ panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
    if (fb->width_px <= 1 || fb->height_px <= 1) {
       fprintf(stderr, "[FONTATLAS9] one-tile fragment job w=%u h=%u min=(%d,%d) max=(%d,%d)\n",
               fb->width_px, fb->height_px, minx, miny, maxx, maxy);
-      fflush(stderr);
    }
    pan_section_pack(job_ptr.cpu, FRAGMENT_JOB, PAYLOAD, payload) {
       payload.bound_min_x = minx >> MALI_TILE_SHIFT;

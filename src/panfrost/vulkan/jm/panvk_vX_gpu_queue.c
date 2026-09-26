@@ -45,9 +45,9 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const 
 #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
 /* ---- end gate ---- */
 #define P4_WAIT(d, a, t) ({ uint64_t _p4a = (a); long long _p4t = (t); \
-   fprintf(stderr, "[P4] L%d tid=%ld > wait_atom atom=%lu to=%lld\n", __LINE__, (long)gettid(), (unsigned long)_p4a, _p4t); fflush(stderr); \
+   fprintf(stderr, "[P4] L%d tid=%ld > wait_atom atom=%lu to=%lld\n", __LINE__, (long)gettid(), (unsigned long)_p4a, _p4t); \
    __auto_type _p4r = kbase_kmod_wait_atom((d), _p4a, _p4t); \
-   fprintf(stderr, "[P4] L%d tid=%ld < wait_atom atom=%lu r=%d\n", __LINE__, (long)gettid(), (unsigned long)_p4a, (int)_p4r); fflush(stderr); \
+   fprintf(stderr, "[P4] L%d tid=%ld < wait_atom atom=%lu r=%d\n", __LINE__, (long)gettid(), (unsigned long)_p4a, (int)_p4r); \
    _p4r; })
 /* ---- end P4 ---- */
 
@@ -69,7 +69,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    struct panvk_physical_device *phys_dev =
       to_panvk_physical_device(dev->vk.physical);
    uint64_t vtc_atom = 0, frag_atom = 0;
-   PANVK_TRACE_PRINTF( "[TRACE] submit_batch: vtc_jc.first_job=%lu frag_jc.first_job=%lu\n", (unsigned long)batch->vtc_jc.first_job, (unsigned long)batch->frag_jc.first_job); fflush(stderr);
+   PANVK_TRACE_PRINTF( "[TRACE] submit_batch: vtc_jc.first_job=%lu frag_jc.first_job=%lu\n", (unsigned long)batch->vtc_jc.first_job, (unsigned long)batch->frag_jc.first_job);
 
    /* Reset the batch if it's already been issued */
    if (batch->issued) {
@@ -100,9 +100,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
          if (unlikely(!queue->warmed_up)) {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
             fprintf(stderr, "[JC-DUMP] vtc_jc before first submit, core_req=0x%x, has_frag=%d\n", vtc_core_req, batch->frag_jc.first_job != 0);
-            fflush(stderr);
             fprintf(stderr, "[JC-DUMP] skip blocking warm-up, use normal submit\n");
-            fflush(stderr);
             queue->warmed_up = true;
          } else {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
@@ -148,12 +146,10 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
          fprintf(stderr,
                  "[FONTATLAS10.3] vtc-before-frag wait atom=%lu done=%d\n",
                  (unsigned long)vtc_atom, (int)done);
-         fflush(stderr);
 
          if (!done) {
             fprintf(stderr,
                     "[FONTATLAS10.3] WARNING: vtc wait timeout before frag\n");
-            fflush(stderr);
          }
       }
 
@@ -163,13 +159,11 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
             queue->in_dep = 0;
          }
          fprintf(stderr, "[FONTATLAS10.3] frag warm-up retry\n");
-         fflush(stderr);
          bool ok = kbase_kmod_job_submit_retry(
             dev->kmod.dev, batch->frag_jc.first_job, BASE_JD_REQ_FS,
             bos, nr_bos, NULL, 0, 5);
          queue->frag_warmed_up = true;
          fprintf(stderr, "[FONTATLAS10.3] frag warm-up ok=%d\n", (int)ok);
-         fflush(stderr);
          frag_atom = 0;
       } else {
          frag_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->frag_jc.first_job,
@@ -286,7 +280,7 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
 {
    struct panvk_gpu_queue *queue = container_of(vk_queue, struct panvk_gpu_queue, vk);
    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
-   fprintf(stderr, "[P4] tid=%ld gpu_queue_submit waits=%u cmdbufs=%u signals=%u\n", (long)gettid(), submit->wait_count, submit->command_buffer_count, submit->signal_count); fflush(stderr);
+   fprintf(stderr, "[P4] tid=%ld gpu_queue_submit waits=%u cmdbufs=%u signals=%u\n", (long)gettid(), submit->wait_count, submit->command_buffer_count, submit->signal_count);
 
    uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
    unsigned ntargets = 0;
@@ -295,7 +289,6 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
       PANVK_TRACE_PRINTF(
          "[FONTATLAS10.3] JM incoming waits=%u: CPU wait begin\\n",
          submit->wait_count);
-      fflush(stderr);
 
       VkResult result = VK_SUCCESS;
       uint64_t in_atoms[8];
@@ -330,7 +323,6 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
       PANVK_TRACE_PRINTF(
          "[FONTATLAS10.3] JM incoming waits=%u: CPU wait result=%d\\n",
          submit->wait_count, result);
-      fflush(stderr);
 
       if (result != VK_SUCCESS)
          return result;

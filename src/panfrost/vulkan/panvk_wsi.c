@@ -81,7 +81,6 @@ panvk_wsi_init(struct panvk_physical_device *physical_device)
            uses_kbase, dri3_option ? dri3_option : "(null)",
            termux_wsi ? termux_wsi : "(null)",
            termux_raw_dri3, kbase_raw_dri3, kbase_dmabuf);
-   fflush(stderr);
 
    result = wsi_device_init(&physical_device->wsi_device,
                             panvk_physical_device_to_handle(physical_device),
