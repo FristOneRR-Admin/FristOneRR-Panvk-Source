@@ -34,6 +34,10 @@
 #include "draw_helper.h"
 #include "poly/geometry.h"
 #include "poly/tessellator.h"
+
+/* v56c: set while the draw emitted for a tessellated draw is recorded. */
+static __thread bool v9_tess_draw_active;
+static __thread bool v9_tess_flip_ff;
 #include "pan_desc.h"
 #include "pan_earlyzs.h"
 #include "pan_encoder.h"
@@ -2290,10 +2294,18 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
            (int)info->index.restart_enable);
    fflush(stderr);
 
+   static int tess_nocull = -1;
+   if (tess_nocull < 0) {
+      const char *e = getenv("PANVK_TESS_NOCULL");
+      tess_nocull = e && e[0] == '1';
+      if (tess_nocull)
+         dprintf(2, "[V9-TESS] culling OFF\n");
+   }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, DRAW, cfg) {
-      cfg.flags_0.cull_front_face = polygon && (rs->cull_mode & VK_CULL_MODE_FRONT_BIT);
-      cfg.flags_0.cull_back_face = polygon && (rs->cull_mode & VK_CULL_MODE_BACK_BIT);
-      cfg.flags_0.front_face_ccw = rs->front_face == VK_FRONT_FACE_COUNTER_CLOCKWISE;
+      cfg.flags_0.cull_front_face = !tess_nocull && polygon && (rs->cull_mode & VK_CULL_MODE_FRONT_BIT);
+      cfg.flags_0.cull_back_face = !tess_nocull && polygon && (rs->cull_mode & VK_CULL_MODE_BACK_BIT);
+      cfg.flags_0.front_face_ccw =
+         (rs->front_face == VK_FRONT_FACE_COUNTER_CLOCKWISE) ^ v9_tess_flip_ff;
       cfg.flags_0.multisample_enable = dyns->ms.rasterization_samples > 1;
       cfg.flags_1.sample_mask = cfg.flags_0.multisample_enable ? dyns->ms.sample_mask : 0xFFFF;
       cfg.flags_0.aligned_line_ends = rs->line.mode == VK_LINE_RASTERIZATION_MODE_BRESENHAM;
@@ -2378,8 +2390,15 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
                                     info->index.index_size);
       indirect_dep = batch->vtc_jc.job_index;
    }
-   pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, false, false, 0,
-                  indirect_dep, &job, false);
+   static int draw_barrier = -1;
+   if (draw_barrier < 0) {
+      const char *e = getenv("PANVK_TESS_DRAWBARRIER");
+      draw_barrier = e && e[0] == '1';
+      if (draw_barrier)
+         dprintf(2, "[V9-TESS] draw job barrier ON\n");
+   }
+   pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, draw_barrier != 0,
+                  draw_barrier != 0, 0, indirect_dep, &job, false);
    return VK_SUCCESS;
 }
 
@@ -2576,6 +2595,14 @@ v9_launch_tess(struct panvk_cmd_buffer *cmdbuf,
       tess_params.ccw = info.ccw;
       tess_params.ccw ^=
          dyn->ts.domain_origin == VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT;
+      static int tess_flip = -1;
+      if (tess_flip < 0) {
+         const char *e = getenv("PANVK_TESS_FLIPCCW");
+         tess_flip = e && e[0] == '1';
+         if (tess_flip)
+            dprintf(2, "[V9-TESS] winding flipped\n");
+      }
+      tess_params.ccw ^= tess_flip;
    }
 
    uint64_t alloc = 0;
@@ -2682,12 +2709,26 @@ v9_launch_tess(struct panvk_cmd_buffer *cmdbuf,
       },
       .prim = gfx->tess.prim,
    };
+   {
+      const char *e = getenv("PANVK_TESS_FLIPFF");
+      const bool force = e && e[0] == '1';
+      static int logged;
+      v9_tess_draw_active = true;
+      /* libpoly emits the opposite winding of what the hardware-indexed
+       * draw needs when ccw == 0 (poly_load_tes_index() is bypassed). */
+      v9_tess_flip_ff = (tess_params.ccw == 0) ^ force;
+      if (!logged++)
+         dprintf(2, "[V9-TESS] ccw=%d flip_front_face=%d\n",
+                 (int)tess_params.ccw, (int)v9_tess_flip_ff);
+   }
    return VK_SUCCESS;
 }
 
 static void
 v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
 {
+   v9_tess_draw_active = false;
+   v9_tess_flip_ff = false;
    PANVK_TRACE_PRINTF(
            "[V9-DRAW] enter prim=%d vertex_count=%u instance_count=%u first_vertex=%u",
            info->prim, info->vertex.count, info->instance.count,
@@ -2734,9 +2775,13 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
       VkResult tr = v9_launch_tess(cmdbuf, info, &tess_draw, fs);
       static int tl = 0;
       if (tl++ < 5)
-         dprintf(2, "[V9-TESS] launch result=%d verts=%u inst=%u patch_cp=%u\n",
-                 tr, info->vertex.count, info->instance.count,
-                 cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points);
+         {
+            static int n_launch_log;
+            if (n_launch_log++ < 3)
+            dprintf(2, "[V9-TESS] launch result=%d verts=%u inst=%u patch_cp=%u\n",
+                    tr, info->vertex.count, info->instance.count,
+                    cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points);
+         }
       if (tr != VK_SUCCESS ||
           (!tess_draw.vertex.count && !tess_draw.indirect.buffer_dev_addr))
          return;
