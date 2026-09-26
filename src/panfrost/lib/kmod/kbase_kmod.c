@@ -2178,7 +2178,7 @@ kbase_kmod_bo_set_label(UNUSED struct pan_kmod_dev *dev,
  * ---------------------------------------------------------------------- */
 
 static struct kbase_atom_slot *
-kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t nbo)
+kbase_atom_alloc_try(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t nbo)
 {
    simple_mtx_lock(&kd->atoms_lock);
    for (unsigned attempt = 0; attempt < 255; attempt++) {
@@ -2212,7 +2212,6 @@ kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t n
    }
 
    simple_mtx_unlock(&kd->atoms_lock);
-   mesa_loge("kbase: JM atom table full or atom IDs exhausted");
    return NULL;
 }
 
@@ -2239,6 +2238,73 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
    fprintf(stderr, "[K1] event atom=%u code=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code);
    if (ev->event_code != BASE_JD_EVENT_DONE && g_kfault_n++ < 40)
       dprintf(2, "[KFAULT] atom=%u code=0x%x core_req=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, g_atom_req[ev->atom_number & 0xff]);
+}
+
+/* v53e: read every kbase event that is already pending (optionally waiting up
+ * to timeout_ms for the first one) and feed it to the atom table. */
+static void
+kbase_drain_events(struct kbase_kmod_dev *kd, int timeout_ms)
+{
+   int fd = kd->base.fd;
+   struct pollfd pfd = { .fd = fd, .events = POLLIN };
+   if (poll(&pfd, 1, timeout_ms) <= 0)
+      return;
+   pthread_mutex_lock(&g_kbase_read_lock);
+   for (int i = 0; i < 256; i++) {
+      struct pollfd rfd = { .fd = fd, .events = POLLIN };
+      if (poll(&rfd, 1, 0) <= 0 || !(rfd.revents & POLLIN))
+         break;
+      struct base_jd_event_v2 ev;
+      ssize_t n;
+      do {
+         n = read(fd, &ev, sizeof(ev));
+      } while (n < 0 && errno == EINTR);
+      if (n != (ssize_t)sizeof(ev))
+         break;
+      simple_mtx_lock(&kd->atoms_lock);
+      kbase_atom_process_event_locked(kd, &ev);
+      kd->last_done_atom_ctx[ev.atom_number & 0xff] = ev.atom_number;
+      kd->last_done_code_ctx[ev.atom_number & 0xff] = ev.event_code;
+      simple_mtx_unlock(&kd->atoms_lock);
+   }
+   pthread_mutex_unlock(&g_kbase_read_lock);
+}
+
+/* v53e: completed atoms whose waiter never came keep their slot forever.
+ * A later wait on such an atom takes the "not present" path, which already
+ * treats it as done, so the slot can be recycled. */
+static unsigned
+kbase_reclaim_completed(struct kbase_kmod_dev *kd)
+{
+   unsigned n = 0;
+   simple_mtx_lock(&kd->atoms_lock);
+   for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
+      if (kd->atoms[i].atom_number && kd->atoms[i].completed) {
+         kd->atoms[i].atom_number = 0;
+         n++;
+      }
+   }
+   simple_mtx_unlock(&kd->atoms_lock);
+   return n;
+}
+
+static struct kbase_atom_slot *
+kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t nbo)
+{
+   static int nlog;
+   for (int tries = 0; tries < 10000; tries++) {
+      struct kbase_atom_slot *s = kbase_atom_alloc_try(kd, bos, nbo);
+      if (s)
+         return s;
+      kbase_drain_events(kd, 0);
+      unsigned freed = kbase_reclaim_completed(kd);
+      if (tries == 0 && nlog++ < 5)
+         dprintf(2, "[ATOMTABLE] full: drained events, reclaimed %u completed slots\n", freed);
+      if (!freed)
+         kbase_drain_events(kd, 1);
+   }
+   dprintf(2, "[ATOMTABLE] still full after 10000 tries, job dropped\n");
+   return NULL;
 }
 
 
