@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "util/macros.h"
 #include "vk_log.h"
 
@@ -49,8 +51,9 @@ panvk_per_arch(CreateQueryPool)(VkDevice _device,
    uint32_t reports_per_query;
    switch (pCreateInfo->queryType) {
    case VK_QUERY_TYPE_OCCLUSION: {
-      /* The counter is per core on Bifrost */
-#if PAN_ARCH < 9
+      /* The counter is per core on every JM GPU (Bifrost and v9 Valhall);
+       * only CSF (v10+) has a single counter. */
+#if PAN_ARCH < 10
       const struct panvk_physical_device *phys_dev =
          to_panvk_physical_device(device->vk.physical);
 
@@ -183,6 +186,19 @@ cpu_write_query_result(void *dst, uint32_t idx, VkQueryResultFlags flags,
    }
 }
 
+static bool
+v58c_fake_occlusion(void)
+{
+   static int v = -1;
+   if (v < 0) {
+      const char *e = getenv("PANVK_FAKE_OCCLUSION");
+      v = e && e[0] == '1';
+      if (v)
+         dprintf(2, "[OQ] fake occlusion ON: every query reports visible\n");
+   }
+   return v;
+}
+
 static void
 cpu_write_occlusion_query_result(void *dst, uint32_t idx,
                                  VkQueryResultFlags flags,
@@ -193,6 +209,21 @@ cpu_write_occlusion_query_result(void *dst, uint32_t idx,
 
    for (uint32_t core_idx = 0; core_idx < core_count; core_idx++)
       result += src[core_idx].value;
+
+   {
+      static unsigned n_total, n_zero, n_lines;
+      n_total++;
+      if (result == 0)
+         n_zero++;
+      if (n_total % 2000 == 0 && n_lines < 30) {
+         n_lines++;
+         dprintf(2, "[OQ] read=%u zero=%u (%u%%) cores=%u last=%llu\n", n_total,
+                 n_zero, n_zero * 100 / n_total, core_count,
+                 (unsigned long long)result);
+      }
+   }
+   if (v58c_fake_occlusion())
+      result = 1000;
 
    cpu_write_query_result(dst, idx, flags, result);
 }
@@ -248,6 +279,8 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
       const uint32_t query = firstQuery + i;
 
       bool available = panvk_query_is_available(pool, query);
+      if (pool->vk.query_type == VK_QUERY_TYPE_OCCLUSION && v58c_fake_occlusion())
+         available = true;
 
       if (!available && (flags & VK_QUERY_RESULT_WAIT_BIT)) {
          status = panvk_query_wait_for_available(device, pool, query);

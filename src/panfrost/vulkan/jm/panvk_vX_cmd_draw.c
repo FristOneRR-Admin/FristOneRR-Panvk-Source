@@ -2308,14 +2308,29 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       cfg.flags_1.sample_mask = cfg.flags_0.multisample_enable ? dyns->ms.sample_mask : 0xFFFF;
       cfg.flags_0.aligned_line_ends = rs->line.mode == VK_LINE_RASTERIZATION_MODE_BRESENHAM;
       cfg.vertex_array.packet = true;
+      /* v58e: occlusion queries on the v9 MALLOC_VERTEX path */
+      cfg.flags_0.occlusion_query = cmdbuf->state.gfx.occlusion_query.mode;
+      cfg.occlusion = cmdbuf->state.gfx.occlusion_query.ptr;
       cfg.minimum_z = z_min;
       cfg.maximum_z = z_max;
       cfg.depth_stencil = zsd_gpu;
       cfg.blend = blend_gpu;
       cfg.blend_count = MAX2(cmdbuf->state.gfx.render.fb.layout.rt_count, 1);
       if (fs) {
-         cfg.flags_0.pixel_kill_operation = MALI_PIXEL_KILL_FORCE_EARLY;
-         cfg.flags_0.zs_update_operation = MALI_PIXEL_KILL_FORCE_EARLY;
+         static int force_early = -1;
+         if (force_early < 0) {
+            const char *e = getenv("PANVK_FORCE_EARLYZS");
+            force_early = e && e[0] == '1';
+         }
+         const bool late_zs = !force_early &&
+            !fs->info.fs.early_fragment_tests &&
+            (fs->info.fs.can_discard || fs->info.fs.writes_depth ||
+             fs->info.fs.writes_stencil || fs->info.fs.writes_coverage ||
+             dyns->ms.alpha_to_coverage_enable);
+         cfg.flags_0.pixel_kill_operation =
+            late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
+         cfg.flags_0.zs_update_operation =
+            late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
          /* FPK would discard what lies underneath; only allowed when blending
           * doesn't read the destination (and no alpha-to-coverage). */
          cfg.flags_0.allow_forward_pixel_to_kill =
