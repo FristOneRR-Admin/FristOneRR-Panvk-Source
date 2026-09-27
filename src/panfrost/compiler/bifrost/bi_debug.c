@@ -36,6 +36,7 @@ DEBUG_GET_ONCE_FLAGS_OPTION(bifrost_debug, "BIFROST_MESA_DEBUG",
                             bifrost_debug_options, 0)
 
 unsigned bifrost_debug = 0;
+__thread int bi_force_noopt = 0;
 
 void
 bifrost_init_debug_options() {

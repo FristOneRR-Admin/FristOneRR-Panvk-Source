@@ -50,6 +50,7 @@
 #include "vk_pipeline_layout.h"
 #include "vk_shader.h"
 #include "vk_util.h"
+#include <stdlib.h>
 
 #define FAU_WORD_COUNT 64
 
@@ -1059,6 +1060,21 @@ panvk_lower_nir_io(nir_shader *nir)
    NIR_PASS(_, nir, nir_opt_constant_folding);
 }
 
+/* bifrost compiler: per-thread switch to skip backend optimisations */
+extern __thread int bi_force_noopt;
+
+static bool
+panvk_spill_noopt_enabled(void)
+{
+   static int enabled = -1;
+
+   if (enabled < 0) {
+      const char *e = getenv("PANVK_SPILL_NOOPT");
+      enabled = !(e && e[0] == '0');
+   }
+   return enabled;
+}
+
 static VkResult
 panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
                   VkShaderCreateFlagsEXT shader_flags,
@@ -1101,7 +1117,24 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
    input.fau.promote_immediates = true;
 
    struct util_dynarray binary = UTIL_DYNARRAY_INIT;
+   /* Some shaders that spill registers hang the GPU when the backend
+    * optimisations run (Far Cry 3), so a shader whose first compile spills
+    * is compiled again without them. PANVK_SPILL_NOOPT=0 disables this. */
+   nir_shader *nir_retry =
+      panvk_spill_noopt_enabled() ? nir_shader_clone(NULL, nir) : NULL;
+   const struct pan_compile_inputs input_saved = input;
+   const __typeof__(shader->info) info_saved = shader->info;
    pan_shader_compile(nir, &input, &binary, &shader->info);
+   if (nir_retry && shader->info.tls_size) {
+      util_dynarray_fini(&binary);
+      util_dynarray_init(&binary, NULL);
+      input = input_saved;
+      shader->info = info_saved;
+      bi_force_noopt = 1;
+      pan_shader_compile(nir_retry, &input, &binary, &shader->info);
+      bi_force_noopt = 0;
+   }
+   ralloc_free(nir_retry);
 
    /* Propagate potential additional FAU values into the panvk info struct. */
    /* FAU consts are pushed as 32bit values, but total_count is for 64bit

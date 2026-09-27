@@ -4443,7 +4443,7 @@ bi_compile_variant_nir(nir_shader *nir,
 
    bi_validate(ctx, "NIR -> BIR");
 
-   bool optimize = !(bifrost_debug & BIFROST_DBG_NOOPT);
+   bool optimize = !(bifrost_debug & BIFROST_DBG_NOOPT) && !bi_force_noopt;
 
    /* Runs before constant folding */
    bi_lower_swizzle(ctx);

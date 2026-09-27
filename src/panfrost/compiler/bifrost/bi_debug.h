@@ -34,6 +34,8 @@ extern "C" {
 #define BIFROST_DBG_DEBUGINFO 0x20000
 
 extern unsigned bifrost_debug;
+/* set by the driver around a compile: skip backend optimisations */
+extern __thread int bi_force_noopt;
 
 void bifrost_init_debug_options(void);
 
