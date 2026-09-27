@@ -357,9 +357,7 @@ kbase_dev_query_props(struct kbase_kmod_dev *kbase_dev,
        * revision (bottom 16 bits). */
       props->gpu_id = ((uint64_t)(raw_gpu_id & 0xffff0000u)) |
                       (uint64_t)(raw_gpu_id & 0xffffu);
-      PANVK_TRACE_PRINTF( "[DEBUG] raw_gpu_id=0x%08x  gpu_id=0x%016llx  arch=%u\n",
-              raw_gpu_id, (unsigned long long)props->gpu_id,
-              (unsigned)(props->gpu_id >> 28));props->gpu_id = ((uint64_t)(raw_gpu_id & 0xffff0000u)) |
+      (void)0;props->gpu_id = ((uint64_t)(raw_gpu_id & 0xffff0000u)) |
                       (uint64_t)(raw_gpu_id & 0xffffu);
    } else {
       /* Fallback: reassemble from individual props (older kbase). */
@@ -1224,11 +1222,11 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
 
    if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_CSF, &ver) == 0) {
       is_csf = true;
-      PANVK_TRACE_PRINTF( "[TRACE] CSF handshake SUCCEEDED, ver=%d.%d\n", ver.major, ver.minor);
+      (void)0;
    } else if (ioctl(fd, KBASE_IOCTL_VERSION_CHECK_JM, &ver) == 0) {
       is_csf = false;
-      PANVK_TRACE_PRINTF( "[TRACE] JM handshake succeeded, ver=%d.%d\n", ver.major, ver.minor);
-   fprintf(stderr, "PANVK-BUILD: androidfinal-fontatlas10.3 (Mesa 26.3.0-devel)\n");
+      (void)0;
+   (void)0;
 
       if (ver.major < 11) {
          mesa_loge("kbase: legacy JM driver version %d.%d not supported "
@@ -1386,8 +1384,7 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
     * DMA_HEAP_IOCTL_ALLOC ioctl works fine on an O_RDONLY fd. */
    if (kbase_dev->dma_heap_fd < 0)
       kbase_dev->dma_heap_fd = open(dma_heap, O_RDONLY | O_CLOEXEC);
-   dprintf(2, "[DMAHEAP] %s -> fd=%d%s\n", dma_heap, kbase_dev->dma_heap_fd,
-           kbase_dev->dma_heap_fd < 0 ? " (unavailable)" : "");
+   (void)0;
    if (kbase_dev->dma_heap_fd < 0)
       mesa_logd("kbase: dma-heap unavailable at %s: %s", dma_heap,
                 strerror(errno));
@@ -1603,9 +1600,7 @@ kbase_kmod_bo_import_host(struct pan_kmod_dev *dev, void *host_ptr,
    kbase_bo->owns_cpu_mapping = false;
 
    if (imp_logs++ < 20)
-      dprintf(2, "[HOSTIMP] ok ptr=%p size=%llu gpu_va=0x%llx same_va=%d\n",
-              host_ptr, (unsigned long long)bo_size,
-              (unsigned long long)kbase_bo->gpu_va, (int)kbase_bo->same_va);
+      (void)0;
 
    uint32_t handle = p_atomic_inc_return(&kbase_dev->next_handle);
    pan_kmod_bo_init(&kbase_bo->base, dev, NULL, bo_size,
@@ -1837,7 +1832,7 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
    kbase_bo->cpu_ptr = cpu_ptr;
    kbase_bo->gpu_mapping = cpu_ptr;
    kbase_bo->gpu_va = kbase_bo->same_va ? (uintptr_t)cpu_ptr : alloc_gpu_va;
-   PANVK_TRACE_PRINTF( "[TRACE] bo_alloc: size=%lu va_pages=%lu same_va=%d cpu_ptr=%p gpu_va=0x%lx\n", (unsigned long)size, (unsigned long)va_pages, kbase_bo->same_va, cpu_ptr, (unsigned long)kbase_bo->gpu_va);
+   (void)0;
 
    /* Allocate a unique u32 handle for the pan_kmod handle_to_bo table. */
    uint32_t handle = p_atomic_inc_return(&kbase_dev->next_handle);
@@ -1930,8 +1925,7 @@ kbase_kmod_bo_export_fd(struct pan_kmod_bo *bo)
          return -1;
       }
       kbase_bo->dmabuf_fd = fd;
-      fprintf(stderr, "PANVK-BUILD: export fallback memfd=%d size=%llu\n",
-              fd, (unsigned long long)bo->size);
+      (void)0;
    }
 
    return fcntl(kbase_bo->dmabuf_fd, F_DUPFD_CLOEXEC, 3);
@@ -2222,7 +2216,7 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
 {
    for (int i = 0; i < KBASE_MAX_ATOMS; i++) {
       if (kd->atoms[i].atom_number == ev->atom_number) {
-         fprintf(stderr, "[K1] event atom=%u code=0x%x waiters=%u\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, (unsigned)kd->atoms[i].waiters);
+         (void)0;
          kd->atoms[i].completed = true;
          kd->atoms[i].errored = (ev->event_code != BASE_JD_EVENT_DONE);
          if (ev->event_code != BASE_JD_EVENT_DONE && g_kfault_n++ < 40)
@@ -2233,7 +2227,7 @@ kbase_atom_process_event_locked(struct kbase_kmod_dev *kd,
          return;
       }
    }
-   fprintf(stderr, "[K1] event atom=%u code=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code);
+   (void)0;
    if (ev->event_code != BASE_JD_EVENT_DONE && g_kfault_n++ < 40)
       dprintf(2, "[KFAULT] atom=%u code=0x%x core_req=0x%x (not in table)\n", (unsigned)ev->atom_number, (unsigned)ev->event_code, g_atom_req[ev->atom_number & 0xff]);
 }
@@ -2297,7 +2291,7 @@ kbase_atom_alloc(struct kbase_kmod_dev *kd, struct pan_kmod_bo **bos, uint32_t n
       kbase_drain_events(kd, 0);
       unsigned freed = kbase_reclaim_completed(kd);
       if (tries == 0 && nlog++ < 5)
-         dprintf(2, "[ATOMTABLE] full: drained events, reclaimed %u completed slots\n", freed);
+         (void)0;
       if (!freed)
          kbase_drain_events(kd, 1);
    }
@@ -2317,7 +2311,7 @@ kbase_poll_ms(void)
       const char *e = getenv("KBASE_POLL_MS");
       v = e ? atoi(e) : 1;
       if (v < 1) v = 1;
-      dprintf(2, "[POLLMS] %d\n", v);
+      (void)0;
    }
    return v;
 }
@@ -2507,10 +2501,10 @@ kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_r
       .nr_atoms = 1,
       .stride = sizeof(atom),
    };
-   fprintf(stderr, "[K1] submit atom=%u req=0x%x dep0=%u/%u dep1=%u/%u nw=%d sizeof=%zu\n", (unsigned)atom.atom_number, (unsigned)core_req, atom.pre_dep[0].atom_id, atom.pre_dep[0].dependency_type, atom.pre_dep[1].atom_id, atom.pre_dep[1].dependency_type, (int)no_waiter, sizeof(atom));
+   (void)0;
    if (ioctl(dev->fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
       mesa_loge("kbase: JOB_SUBMIT(dep) err=%d", errno);
-      fprintf(stderr, "[K1] SUBMIT FAILED atom=%u errno=%d\n", (unsigned)atom.atom_number, errno);
+      (void)0;
       simple_mtx_lock(&kd->atoms_lock);
       slot->atom_number = 0;
       simple_mtx_unlock(&kd->atoms_lock);

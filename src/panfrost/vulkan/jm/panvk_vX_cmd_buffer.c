@@ -56,10 +56,7 @@ panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
    if (!job_ptr.gpu)
       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
-   PANVK_TRACE_PRINTF( "[FRAGJOB-CHECK] tiling_area min=(%d,%d) max=(%d,%d) w=%u h=%u fbd=0x%llx\n",
-           fb->tiling_area_px.min_x, fb->tiling_area_px.min_y,
-           fb->tiling_area_px.max_x, fb->tiling_area_px.max_y,
-           fb->width_px, fb->height_px, (unsigned long long)fbd);
+   (void)0;
    int minx = fb->tiling_area_px.min_x;
    int miny = fb->tiling_area_px.min_y;
    int maxx = fb->tiling_area_px.max_x;
@@ -69,8 +66,7 @@ panvk_cmd_prepare_fragment_job(struct panvk_cmd_buffer *cmdbuf, uint64_t fbd)
    if (maxy <= miny)
       maxy = miny + 1;
    if (fb->width_px <= 1 || fb->height_px <= 1) {
-      fprintf(stderr, "[FONTATLAS9] one-tile fragment job w=%u h=%u min=(%d,%d) max=(%d,%d)\n",
-              fb->width_px, fb->height_px, minx, miny, maxx, maxy);
+      (void)0;
    }
    pan_section_pack(job_ptr.cpu, FRAGMENT_JOB, PAYLOAD, payload) {
       payload.bound_min_x = minx >> MALI_TILE_SHIFT;

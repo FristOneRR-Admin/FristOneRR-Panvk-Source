@@ -60,7 +60,7 @@ v61a_no_smc(void)
    if (v < 0) {
       const char *e = getenv("PANVK_NO_SMC");
       v = (e && atoi(e)) ? 1 : 0;
-      fprintf(stderr, "[SMC] shader_modifies_coverage %s\n", v ? "OFF (PANVK_NO_SMC=1)" : "ON");
+      (void)0;
    }
    return v;
 }
@@ -2318,19 +2318,14 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
                     ? (info->index.buffer_dev_addr + info->index.offset)
                     : 0;
    }
-   PANVK_TRACE_PRINTF(
-           "[V9-IDX] type=%u off=%u addr=0x%llx count=%u base=%d restart=%d\n",
-           info->index.index_size, info->index.offset,
-           (unsigned long long)(info->index.buffer_dev_addr + info->index.offset),
-           info->vertex.count, info->vertex.base,
-           (int)info->index.restart_enable);
+   (void)0;
 
    static int tess_nocull = -1;
    if (tess_nocull < 0) {
       const char *e = getenv("PANVK_TESS_NOCULL");
       tess_nocull = e && e[0] == '1';
       if (tess_nocull)
-         dprintf(2, "[V9-TESS] culling OFF\n");
+         (void)0;
    }
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, DRAW, cfg) {
       cfg.flags_0.cull_front_face = !tess_nocull && polygon && (rs->cull_mode & VK_CULL_MODE_FRONT_BIT);
@@ -2405,8 +2400,7 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       cfg.fau_count = vs->fau.total_count;
    }
 
-   PANVK_TRACE_PRINTF( "[VARYINGDEBUG] spds.var alloc=%d\n",
-           panvk_priv_mem_check_alloc(vs->spds.var));
+   (void)0;
    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, VARYING, cfg) {
       if (panvk_priv_mem_check_alloc(vs->spds.var)) {
          cfg.resources = cmdbuf->state.gfx.vs.desc.res_table;
@@ -2449,7 +2443,7 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
       const char *e = getenv("PANVK_TESS_DRAWBARRIER");
       draw_barrier = e && e[0] == '1';
       if (draw_barrier)
-         dprintf(2, "[V9-TESS] draw job barrier ON\n");
+         (void)0;
    }
    pan_jc_add_job(&batch->vtc_jc, MALI_JOB_TYPE_MALLOC_VERTEX, draw_barrier != 0,
                   draw_barrier != 0, 0, indirect_dep, &job, false);
@@ -2464,7 +2458,7 @@ v9_tess_stage(void)
       const char *e = getenv("PANVK_TESSSTAGE");
       v = e ? atoi(e) : 7;
       if (e)
-         dprintf(2, "[V9-TESS] stage limit %d\n", v);
+         (void)0;
    }
    return v;
 }
@@ -2654,7 +2648,7 @@ v9_launch_tess(struct panvk_cmd_buffer *cmdbuf,
          const char *e = getenv("PANVK_TESS_FLIPCCW");
          tess_flip = e && e[0] == '1';
          if (tess_flip)
-            dprintf(2, "[V9-TESS] winding flipped\n");
+            (void)0;
       }
       tess_params.ccw ^= tess_flip;
    }
@@ -2772,8 +2766,7 @@ v9_launch_tess(struct panvk_cmd_buffer *cmdbuf,
        * draw needs when ccw == 0 (poly_load_tes_index() is bypassed). */
       v9_tess_flip_ff = (tess_params.ccw == 0) ^ force;
       if (!logged++)
-         dprintf(2, "[V9-TESS] ccw=%d flip_front_face=%d\n",
-                 (int)tess_params.ccw, (int)v9_tess_flip_ff);
+         (void)0;
    }
    return VK_SUCCESS;
 }
@@ -2783,10 +2776,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
 {
    v9_tess_draw_active = false;
    v9_tess_flip_ff = false;
-   PANVK_TRACE_PRINTF(
-           "[V9-DRAW] enter prim=%d vertex_count=%u instance_count=%u first_vertex=%u",
-           info->prim, info->vertex.count, info->instance.count,
-           info->vertex.base);
+   (void)0;
    const struct panvk_shader_variant *vs =
       panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
    if (!vs || !panvk_priv_mem_check_alloc(vs->spds.pos_triangles))
@@ -2820,7 +2810,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
    if (result != VK_SUCCESS)
       return;
    result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, 0);
-   PANVK_TRACE_PRINTF( "[V9-DRAW] tiler_context result=%d", result);
+   (void)0;
    if (result != VK_SUCCESS)
       return;
 
@@ -2832,9 +2822,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          {
             static int n_launch_log;
             if (n_launch_log++ < 3)
-            dprintf(2, "[V9-TESS] launch result=%d verts=%u inst=%u patch_cp=%u\n",
-                    tr, info->vertex.count, info->instance.count,
-                    cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points);
+            (void)0;
          }
       if (tr != VK_SUCCESS ||
           (!tess_draw.vertex.count && !tess_draw.indirect.buffer_dev_addr))
@@ -2896,10 +2884,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
          return;
       cmdbuf->state.gfx.fs.push_uniforms = fs_push.gpu;
    }
-   PANVK_TRACE_PRINTF(
-           "[V9-DRAW] emit malloc vertex job blend=0x%llx zsd=0x%llx",
-           (unsigned long long)blend_gpu,
-           (unsigned long long)zsd_gpu);
+   (void)0;
    result = v9_emit_malloc_vertex_job(cmdbuf, info, vs, fs, blend_gpu, zsd_gpu);
    if (result != VK_SUCCESS)
       return;
@@ -2939,7 +2924,7 @@ panvk_per_arch(CmdDrawIndexed)(VkCommandBuffer commandBuffer,
 
    uint32_t index_size = cmdbuf->state.gfx.ib.index_size;
    if (index_size == 0 || cmdbuf->state.gfx.ib.size == 0) {
-      PANVK_TRACE_PRINTF( "[V9-IDX] skip: no index buffer bound\n");
+      (void)0;
       return;
    }
 
@@ -2973,7 +2958,7 @@ panvk_per_arch(CmdDrawIndirect)(VkCommandBuffer commandBuffer, VkBuffer _buffer,
       };
       static int logn = 0;
       if (logn++ < 5)
-         dprintf(2, "[V9-INDIRECT] draw #%d count=%u\n", logn, drawCount);
+         (void)0;
       /* The helper patches sysvals in the push-uniform block: make sure this
        * draw gets its own block and the next draw doesn't reuse it. */
       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
@@ -3005,7 +2990,7 @@ panvk_per_arch(CmdDrawIndexedIndirect)(VkCommandBuffer commandBuffer,
       };
       static int logn = 0;
       if (logn++ < 5)
-         dprintf(2, "[V9-INDIRECT] indexed draw #%d count=%u\n", logn, drawCount);
+         (void)0;
       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
       v9_cmd_draw(cmdbuf, &info);
       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);

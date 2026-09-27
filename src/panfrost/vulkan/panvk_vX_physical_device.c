@@ -14,6 +14,11 @@
 #include <sys/sysmacros.h>
 
 #include "git_sha1.h"
+#include <stdio.h>
+
+#ifndef FRISTONERR_VERSION
+#define FRISTONERR_VERSION "v64"
+#endif
 
 #include "vk_android.h"
 #include "vk_device.h"
@@ -53,8 +58,7 @@ panvk_per_arch(get_physical_device_extensions)(
    struct vk_device_extension_table *ext)
 {
    bool has_gralloc = vk_android_get_ugralloc() != NULL;
-   fprintf(stderr, "[FristOneRR1] has_gralloc=%d ugralloc=%p\n",
-           (int)has_gralloc, (void*)vk_android_get_ugralloc());
+   (void)0;
 
    *ext = (struct vk_device_extension_table){
       .KHR_8bit_storage = true,
@@ -1374,7 +1378,15 @@ panvk_per_arch(get_physical_device_properties)(
 
    snprintf(properties->driverName, VK_MAX_DRIVER_NAME_SIZE, "panvk");
    snprintf(properties->driverInfo, VK_MAX_DRIVER_INFO_SIZE,
-            "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
+            "FristOneRR " FRISTONERR_VERSION " (Mesa " PACKAGE_VERSION ")"
+            MESA_GIT_SHA1);
+   {
+      static bool logged;
+      if (!logged) {
+         logged = true;
+         dprintf(2, "%s\n", properties->driverInfo);
+      }
+   }
 
    /* VK_EXT_physical_device_drm */
    if (device->drm.primary_rdev) {

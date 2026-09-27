@@ -1357,7 +1357,7 @@ panvk_shader_upload(struct panvk_device *dev,
          cfg.flush_to_zero_mode = shader_ftz_mode(shader);
       }
 
-      PANVK_TRACE_PRINTF( "[IDVSDEBUG] stage=%d secondary_enable=%d secondary_offset=%u bin_size=%u\n", shader->info.stage, shader->info.vs.secondary_enable, shader->info.vs.secondary_offset, shader->bin_size);
+      (void)0;
       if (shader->info.vs.secondary_enable) {
          shader->spds.var =
             panvk_pool_alloc_desc(&dev->mempools.rw, SHADER_PROGRAM);

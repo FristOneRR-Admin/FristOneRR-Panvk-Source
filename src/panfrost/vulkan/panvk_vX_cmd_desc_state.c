@@ -287,11 +287,7 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
       for (uint32_t i = 0; i < first_unused_set; i++) {
          const struct panvk_descriptor_set *set = desc_state->sets[i];
 
-         PANVK_TRACE_PRINTF( "[DESCDEBUG] set-fill: i=%u set_ptr=%p mask_bit=%d "
-                 "descs.dev=0x%llx desc_count=%u\n",
-                 i, (void *)set, !!(desc_info->used_set_mask & BITFIELD_BIT(i)),
-                 set ? (unsigned long long)set->descs.dev : 0ull,
-                 set ? set->desc_count : 0u);
+         (void)0;
 
          pan_pack(&res_table[i + 1], RESOURCE, cfg) {
             if (desc_info->used_set_mask & BITFIELD_BIT(i)) {
@@ -317,9 +313,7 @@ panvk_per_arch(cmd_prepare_shader_res_table)(
    }
 
    shader_desc_state->res_table = ptr.gpu | res_count;
-   PANVK_TRACE_PRINTF( "[DESCDEBUG] res_table: used_set_mask=0x%x "
-           "first_unused_set=%u res_count=%u\n",
-           desc_info->used_set_mask, first_unused_set, res_count);
+   (void)0;
    mesa_logd("panvk res-table: gpu=0x%" PRIx64 " count=%u used=0x%x driver=0x%" PRIx64 " driver_size=%u", ptr.gpu, res_count, desc_info->used_set_mask, shader_desc_state->driver_set.dev_addr, shader_desc_state->driver_set.size);
 
    return VK_SUCCESS;

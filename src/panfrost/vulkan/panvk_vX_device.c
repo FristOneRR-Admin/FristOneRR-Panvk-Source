@@ -604,7 +604,7 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
          tiler_heap_mb = atoi(e);
       static int logged;
       if (!logged++)
-         dprintf(2, "[TILERHEAP] %llu MB\n", (unsigned long long)tiler_heap_mb);
+         (void)0;
       result = panvk_priv_bo_create(
          device, tiler_heap_mb * 1024 * 1024,
          PAN_KMOD_BO_FLAG_NO_MMAP | PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT,

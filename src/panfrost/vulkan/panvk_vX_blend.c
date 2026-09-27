@@ -133,7 +133,7 @@ emit_blend_desc(const struct pan_blend_state *state, uint8_t rt_idx,
 {
    const struct pan_blend_rt_state *rt = &state->rts[rt_idx];
 
-   fprintf(stderr, "[BL1] rt=%u loc=%u en=%d mask=0x%x rgb=%d/%d/%d a=%d/%d/%d shader=%d opaque=%d fmt=%d\n", rt_idx, loc, (int)rt->equation.blend_enable, (unsigned)rt->equation.color_mask, (int)rt->equation.rgb_func, (int)rt->equation.rgb_src_factor, (int)rt->equation.rgb_dst_factor, (int)rt->equation.alpha_func, (int)rt->equation.alpha_src_factor, (int)rt->equation.alpha_dst_factor, blend_shader != 0, (int)pan_blend_is_opaque(rt->equation), (int)rt->format);
+   (void)0;
    pan_pack(bd, BLEND, cfg) {
       if (loc == MESA_VK_ATTACHMENT_UNUSED || !rt->equation.color_mask) {
          cfg.enable = false;
@@ -368,7 +368,7 @@ panvk_per_arch(blend_emit_descs)(struct panvk_cmd_buffer *cmdbuf,
       /* We have the format and the constants so we can optimize the blend
        * equation before we decide if we actually need a blend shader.
        */
-      fprintf(stderr, "[BL0] i=%u loc=%u vk_en=%d src=%d dst=%d op=%d asrc=%d adst=%d aop=%d wmask=0x%x vkfmt=%d\n", i, loc, (int)cb->attachments[i].blend_enable, (int)cb->attachments[i].src_color_blend_factor, (int)cb->attachments[i].dst_color_blend_factor, (int)cb->attachments[i].color_blend_op, (int)cb->attachments[i].src_alpha_blend_factor, (int)cb->attachments[i].dst_alpha_blend_factor, (int)cb->attachments[i].alpha_blend_op, (unsigned)cb->attachments[i].write_mask, (int)color_attachment_formats[i]);
+      (void)0;
       pan_blend_optimize_equation(&rt->equation, rt->format, bs.constants);
 
       blend_info->any_dest_read |= pan_blend_reads_dest(rt->equation);

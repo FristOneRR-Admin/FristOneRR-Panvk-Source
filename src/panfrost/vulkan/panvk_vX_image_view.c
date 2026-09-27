@@ -81,7 +81,7 @@ panvk_storage_pview(const struct panvk_image_view *view,
 static VkResult
 prepare_tex_descs(struct panvk_image_view *view)
 {
-   fprintf(stderr, "[FristOneRR1] prepare_tex_descs begin fmt=%d\n", view->vk.view_format);
+   (void)0;
    /* Use a temporary pan_image_view so we can tweak it for texture
     * descriptor emission without changing the original definition.
     */
@@ -187,9 +187,8 @@ prepare_tex_descs(struct panvk_image_view *view)
          }
       } else {
          GENX(pan_sampled_texture_emit)(&pview, &view->descs.tex[0], &ptr);
-      { const uint8_t *td = (const uint8_t *)&view->descs.tex[0]; PANVK_TRACE_PRINTF( "[TEXDUMP] view=%p fmt=%d dim=%d w=%u h=%u payload_gpu=0x%llx bytes:", (void *)view, view->pview.format, view->pview.dim, view->vk.extent.width, view->vk.extent.height, (unsigned long long)ptr.gpu); for (int _i = 0; _i < 32; _i++) fprintf(stderr, " %02x", td[_i]); fprintf(stderr, "\n"); }
-      fprintf(stderr, "[FristOneRR1] skip PIXDUMP base=0x%llx\n",
-              (unsigned long long)image->planes[0].plane.base);
+      { const uint8_t *td = (const uint8_t *)&view->descs.tex[0]; (void)0; for (int _i = 0; _i < 32; _i++) fprintf(stderr, " %02x", td[_i]); fprintf(stderr, "\n"); }
+      (void)0;
 #if PAN_ARCH >= 9
          if (has_storage) {
             struct pan_image_view spview = panvk_storage_pview(view, &pview);
@@ -341,9 +340,7 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
    VK_FROM_HANDLE(panvk_image, image, pCreateInfo->image);
    struct panvk_image_view *view;
    VkResult result;
-   fprintf(stderr, "[FristOneRR1] CreateImageView fmt=%d viewfmt=%d type=%d usage=0x%lx img=%p\n",
-           pCreateInfo->format, image ? image->vk.format : -1,
-           pCreateInfo->viewType, (unsigned long)(image ? image->vk.usage : 0), (void*)image);
+   (void)0;
    if (image && (pCreateInfo->format == VK_FORMAT_R8_UNORM ||
                  image->vk.format == VK_FORMAT_R8_UNORM)) {
       uint32_t pitch = 0;
@@ -352,17 +349,13 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
          pitch = pan_image_get_wsi_row_pitch(&image->planes[0].image, 0, 0);
          mod = image->planes[0].image.props.modifier;
       }
-      fprintf(stderr, "[FONTATLAS10] R8 %ux%ux%u pitch=%u mod=0x%llx tiling=%d swizzle=%d,%d,%d,%d\n",
-              image->vk.extent.width, image->vk.extent.height, image->vk.extent.depth,
-              pitch, (unsigned long long)mod, (int)image->vk.tiling,
-              (int)pCreateInfo->components.r, (int)pCreateInfo->components.g,
-              (int)pCreateInfo->components.b, (int)pCreateInfo->components.a);
+      (void)0;
    }
 
    view = vk_image_view_create(&device->vk, pCreateInfo,
                                pAllocator, sizeof(*view));
    if (view == NULL) {
-      fprintf(stderr, "[FristOneRR1] CreateImageView view=NULL\n");
+      (void)0;
       return panvk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
    }
 
@@ -475,8 +468,7 @@ panvk_per_arch(CreateImageView)(VkDevice _device,
    if (view->vk.usage & tex_usage_mask) {
       result = prepare_tex_descs(view);
       if (result != VK_SUCCESS) {
-         fprintf(stderr, "[FristOneRR1] prepare_tex_descs result=0x%x fmt=%d\n",
-                 result, view->vk.view_format);
+         (void)0;
          goto err_destroy_iview;
       }
    }

@@ -77,10 +77,7 @@ panvk_wsi_init(struct panvk_physical_device *physical_device)
 #endif
    VkResult result;
 
-   PANVK_TRACE_PRINTF( "[WSI-CFG] uses_kbase=%d dri3_option=%s termux_wsi=%s termux_raw_dri3=%d kbase_raw_dri3=%d kbase_dmabuf=%d\n",
-           uses_kbase, dri3_option ? dri3_option : "(null)",
-           termux_wsi ? termux_wsi : "(null)",
-           termux_raw_dri3, kbase_raw_dri3, kbase_dmabuf);
+   (void)0;
 
    result = wsi_device_init(&physical_device->wsi_device,
                             panvk_physical_device_to_handle(physical_device),

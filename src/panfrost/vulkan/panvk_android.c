@@ -239,11 +239,10 @@ panvk_android_ahb_image_init(struct AHardwareBuffer *ahb,
 
    VkImageDrmFormatModifierExplicitCreateInfoEXT mod_info;
    VkSubresourceLayout layouts[PANVK_MAX_PLANES];
-   fprintf(stderr, "[FristOneRR1] get_ahb_layout begin\n");
+   (void)0;
    result =
       vk_android_get_ahb_layout(ahb, &mod_info, layouts, PANVK_MAX_PLANES);
-   fprintf(stderr, "[FristOneRR1] get_ahb_layout result=0x%x mod=0x%llx\n",
-           result, (unsigned long long)mod_info.drmFormatModifier);
+   (void)0;
    if (result != VK_SUCCESS)
       return result;
    __vk_append_struct(img->vk.android_deferred_create_info, &mod_info);
@@ -254,9 +253,9 @@ panvk_android_ahb_image_init(struct AHardwareBuffer *ahb,
    };
    __vk_append_struct(img->vk.android_deferred_create_info, &external_info);
 
-   fprintf(stderr, "[FristOneRR1] panvk_image_init begin\n");
+   (void)0;
    result = panvk_image_init(img, img->vk.android_deferred_create_info);
-   fprintf(stderr, "[FristOneRR1] panvk_image_init result=0x%x\n", result);
+   (void)0;
    if (result != VK_SUCCESS)
       return result;
 
@@ -274,16 +273,14 @@ panvk_android_import_ahb_memory(VkDevice device,
    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(ahb);
    assert(handle && handle->numFds > 0);
    int dma_buf_fd = handle->data[0];
-   fprintf(stderr, "[FristOneRR1] numFds=%d\n", handle->numFds);
+   (void)0;
    for (int i = 0; i < handle->numFds; i++) {
       off_t sz = lseek(handle->data[i], 0, SEEK_END);
-      fprintf(stderr, "[FristOneRR1] import fd[%d]=%d seek=%lld\n",
-              i, handle->data[i], (long long)sz);
+      (void)0;
       if (sz > 0) {
          dma_buf_fd = handle->data[i];
          lseek(dma_buf_fd, 0, SEEK_SET);
-         fprintf(stderr, "[FristOneRR1] import using fd=%d size=%lld\n",
-                 dma_buf_fd, (long long)sz);
+         (void)0;
          break;
       }
    }
@@ -298,17 +295,15 @@ panvk_android_import_ahb_memory(VkDevice device,
       pAllocateInfo->pNext, MEMORY_DEDICATED_ALLOCATE_INFO);
    if (dedicated_info && dedicated_info->image != VK_NULL_HANDLE) {
       img_handle = dedicated_info->image;
-      fprintf(stderr, "[FristOneRR1] dedicated image=%p\n", (void*)img_handle);
+      (void)0;
       VK_FROM_HANDLE(panvk_image, img, img_handle);
-      fprintf(stderr, "[FristOneRR1] panvk_image=%p deferred=%p\n",
-              (void*)img, img ? (void*)img->vk.android_deferred_create_info : NULL);
+      (void)0;
       result = panvk_android_ahb_image_init(ahb, img);
-      fprintf(stderr, "[FristOneRR1] image_init result=0x%x\n", result);
+      (void)0;
       if (result == VK_SUCCESS) {
          result = panvk_android_get_image_mem_reqs(device, img_handle,
                                                    dma_buf_fd, &mem_reqs);
-         fprintf(stderr, "[FristOneRR1] img_mem_reqs result=0x%x size=%llu bits=0x%x\n",
-                 result, (unsigned long long)mem_reqs.size, mem_reqs.memoryTypeBits);
+         (void)0;
       }
    } else if (dedicated_info && dedicated_info->buffer != VK_NULL_HANDLE) {
       buf_handle = dedicated_info->buffer;
@@ -366,11 +361,10 @@ panvk_android_import_ahb_memory(VkDevice device,
       .allocationSize = mem_reqs.size,
       .memoryTypeIndex = mem_type_index,
    };
-   fprintf(stderr, "[FristOneRR1] import AllocateMemory size=%llu type=%u fd=%d\n",
-           (unsigned long long)mem_reqs.size, mem_type_index, dup_fd);
+   (void)0;
    result = dev->dispatch_table.AllocateMemory(device, &alloc_info, pAllocator,
                                                pMemory);
-   fprintf(stderr, "[FristOneRR1] import AllocateMemory result=0x%x\n", result);
+   (void)0;
    if (result != VK_SUCCESS)
       close(dup_fd);
 
@@ -417,7 +411,7 @@ panvk_android_allocate_ahb_memory(VkDevice device,
 
    result = panvk_android_import_ahb_memory(device, pAllocateInfo, ahb,
                                             pAllocator, pMemory);
-   fprintf(stderr, "[FristOneRR1] import result=0x%x ahb=%p info=%p\n", result, (void*)ahb, (void*)ahb_info);
+   (void)0;
    if (result != VK_SUCCESS) {
       AHardwareBuffer_release(ahb);
       return panvk_error(device, result);

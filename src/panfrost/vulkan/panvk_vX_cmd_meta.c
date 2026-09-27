@@ -27,9 +27,7 @@ copy_to_image_use_gfx_pipeline(struct panvk_image *dst_img)
                       vk_format_get_blocksize(dst_img->vk.format) <= 4;
    bool result = gfx_forced || afbc;
 
-   PANVK_TRACE_PRINTF( "[COPYDEBUG] use_gfx_pipeline=%d afbc=%d mod=0x%llx format=%d blocksize=%u\n",
-           result, afbc, (unsigned long long)dst_img->vk.drm_format_mod,
-           dst_img->vk.format, vk_format_get_blocksize(dst_img->vk.format));
+   (void)0;
 
    return result;
 }

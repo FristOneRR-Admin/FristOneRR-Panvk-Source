@@ -667,7 +667,7 @@ static VkResult
 kbase_cpu_sync_init(struct vk_device *device, struct vk_sync *sync,
                     uint64_t initial_value)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_init\n");
+   (void)0;
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
    int ret = mtx_init(&ks->mutex, mtx_plain);
    if (ret != thrd_success)
@@ -690,7 +690,7 @@ kbase_cpu_sync_init(struct vk_device *device, struct vk_sync *sync,
 static void
 kbase_cpu_sync_finish(UNUSED struct vk_device *device, struct vk_sync *sync)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_finish\n");
+   (void)0;
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
    u_cnd_monotonic_destroy(&ks->cond);
    mtx_destroy(&ks->mutex);
@@ -700,11 +700,11 @@ static VkResult
 kbase_cpu_sync_signal(UNUSED struct vk_device *device, struct vk_sync *sync,
                       UNUSED uint64_t value)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_signal\n");
+   (void)0;
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
    mtx_lock(&ks->mutex);
    ks->state = KBASE_CPU_SYNC_SIGNALED;
-   fprintf(stderr, "[P3] %s ks=%p -> SIGNALED tid=%ld\n", __func__, (void *)ks, (long)gettid());
+   (void)0;
    ks->result = VK_SUCCESS;
    ks->pending_data = NULL;
    ks->pending_wait = NULL;
@@ -716,22 +716,22 @@ kbase_cpu_sync_signal(UNUSED struct vk_device *device, struct vk_sync *sync,
 static VkResult
 kbase_cpu_sync_reset(UNUSED struct vk_device *device, struct vk_sync *sync)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_reset\n");
+   (void)0;
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
    mtx_lock(&ks->mutex);
    while (ks->state == KBASE_CPU_SYNC_WAITING) {
-      fprintf(stderr, "[SYNC] reset waits for WAITING\n");
+      (void)0;
       u_cnd_monotonic_wait(&ks->cond, &ks->mutex);
    }
    ks->state = KBASE_CPU_SYNC_RESET;
-   fprintf(stderr, "[P3] %s ks=%p -> RESET tid=%ld\n", __func__, (void *)ks, (long)gettid());
+   (void)0;
    ks->result = VK_SUCCESS;
    ks->pending_data = NULL;
    ks->pending_wait = NULL;
    memset(ks->targets, 0, sizeof(ks->targets));
    u_cnd_monotonic_broadcast(&ks->cond);
    mtx_unlock(&ks->mutex);
-   fprintf(stderr, "[SYNC] leave kbase_cpu_sync_reset\n");
+   (void)0;
    return VK_SUCCESS;
 }
 
@@ -760,8 +760,8 @@ panvk_kbase_sync_set_pending(
    memcpy(ks->targets, targets, sizeof(ks->targets));
    ks->result = VK_SUCCESS;
    ks->state = KBASE_CPU_SYNC_PENDING;
-   fprintf(stderr, "[P3] %s ks=%p -> PENDING t0=%lu tid=%ld\n", __func__, (void *)ks, (unsigned long)ks->targets[0], (long)gettid());
-   PANVK_TRACE_PRINTF( "[TRACE] set_pending: targets[0]=%lu targets[1]=%lu targets[2]=%lu\n", (unsigned long)ks->targets[0], (unsigned long)ks->targets[1], (unsigned long)ks->targets[2]);
+   (void)0;
+   (void)0;
    u_cnd_monotonic_broadcast(&ks->cond);
    mtx_unlock(&ks->mutex);
 }
@@ -796,7 +796,7 @@ kbase_cpu_sync_wait_one_impl(struct vk_device *device, struct kbase_cpu_sync *ks
                         enum vk_sync_wait_flags wait_flags,
                         uint64_t abs_timeout_ns)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_wait_one\n");
+   (void)0;
    struct timespec abs_timeout_ts;
    timespec_from_nsec(&abs_timeout_ts, abs_timeout_ns);
 
@@ -824,24 +824,24 @@ kbase_cpu_sync_wait_one_impl(struct vk_device *device, struct kbase_cpu_sync *ks
          ks->state = KBASE_CPU_SYNC_WAITING;
          mtx_unlock(&ks->mutex);
 
-         PANVK_TRACE_PRINTF( "[TRACE] wait_one: calling wait() targets[0]=%lu abs_timeout_ns=%llu\n", (unsigned long)targets[0], (unsigned long long)abs_timeout_ns);
-         fprintf(stderr, "[W1] pending: calling wait() atom=%lu\n", (unsigned long)targets[0]);
+         (void)0;
+         (void)0;
          VkResult result = wait(data, targets, abs_timeout_ns);
-         fprintf(stderr, "[W1] pending: wait() -> %d\n", (int)result);
-         PANVK_TRACE_PRINTF( "[TRACE] wait_one: wait() returned %d\n", result);
+         (void)0;
+         (void)0;
 
          mtx_lock(&ks->mutex);
          if (result == VK_SUCCESS) {
             ks->state = KBASE_CPU_SYNC_SIGNALED;
-            fprintf(stderr, "[P3] %s ks=%p -> SIGNALED tid=%ld\n", __func__, (void *)ks, (long)gettid());
+            (void)0;
             ks->pending_data = NULL;
             ks->pending_wait = NULL;
          } else if (result == VK_TIMEOUT) {
             ks->state = KBASE_CPU_SYNC_PENDING;
-            fprintf(stderr, "[P3] %s ks=%p -> PENDING t0=%lu tid=%ld\n", __func__, (void *)ks, (unsigned long)ks->targets[0], (long)gettid());
+            (void)0;
          } else {
             ks->state = KBASE_CPU_SYNC_FAILED;
-            fprintf(stderr, "[P3] %s ks=%p -> FAILED tid=%ld\n", __func__, (void *)ks, (long)gettid());
+            (void)0;
             ks->result = result;
          }
          u_cnd_monotonic_broadcast(&ks->cond);
@@ -887,13 +887,9 @@ kbase_cpu_sync_wait_one(struct vk_device *device, struct kbase_cpu_sync *ks,
       st = (int)ks->state;
       mtx_unlock(&ks->mutex);
    }
-   fprintf(stderr, "[W1] %s tid=%ld ks=%p st=%d flags=0x%x %s\n", nm,
-           (long)gettid(), (void *)ks, st, (unsigned)wait_flags,
-           abs_timeout_ns == UINT64_MAX ? "inf" : "timed");
+   (void)0;
    VkResult r = kbase_cpu_sync_wait_one_impl(device, ks, wait_flags, abs_timeout_ns);
-   fprintf(stderr, "[W1] %s tid=%ld ks=%p ret=%d dt_ms=%lld\n", nm,
-           (long)gettid(), (void *)ks, (int)r,
-           (long long)(((int64_t)os_time_get_nano() - t0) / 1000000));
+   (void)0;
    return r;
 }
 
@@ -903,7 +899,7 @@ kbase_cpu_sync_wait_many(struct vk_device *device,
                          enum vk_sync_wait_flags wait_flags,
                          uint64_t abs_timeout_ns)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_wait_many count=%u timeout=%llu\n", (unsigned)wait_count, (unsigned long long)abs_timeout_ns);
+   (void)0;
    bool wait_any = !!(wait_flags & VK_SYNC_WAIT_ANY);
 
    if (!wait_any) {
@@ -938,7 +934,7 @@ static VkResult
 kbase_cpu_sync_move(UNUSED struct vk_device *device, struct vk_sync *dst,
                     struct vk_sync *src)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_move\n");
+   (void)0;
    if (dst == src)
       return VK_SUCCESS;
 
@@ -978,7 +974,7 @@ static VkResult
 kbase_cpu_sync_import_sync_file(struct vk_device *device, struct vk_sync *sync,
                                 int sync_file)
 {
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_import_sync_file fd=%d\n", sync_file);
+   (void)0;
    if (sync_file >= 0) {
       struct pollfd pfd = { .fd = sync_file, .events = POLLIN };
       int waited_ms = 0;
@@ -991,7 +987,7 @@ kbase_cpu_sync_import_sync_file(struct vk_device *device, struct vk_sync *sync,
          waited_ms += 100;
       }
       if (waited_ms >= 2000)
-         fprintf(stderr, "[SYNC] import_sync_file: fence timeout, signaling anyway\n");
+         (void)0;
    }
    return kbase_cpu_sync_signal(device, sync, 0);
 }
@@ -1001,13 +997,13 @@ kbase_cpu_sync_export_sync_file(struct vk_device *device, struct vk_sync *sync,
                                 int *sync_file)
 {
    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
-   fprintf(stderr, "[SYNC] enter kbase_cpu_sync_export_sync_file\n");
+   (void)0;
 
    mtx_lock(&ks->mutex);
    enum kbase_cpu_sync_state st = ks->state;
    mtx_unlock(&ks->mutex);
    if (st == KBASE_CPU_SYNC_RESET) {
-      fprintf(stderr, "[SYNC] export_sync_file on RESET sync -> signaled (-1)\n");
+      (void)0;
       *sync_file = -1;
       return VK_SUCCESS;
    }
@@ -1236,11 +1232,9 @@ panvk_physical_device_init(struct panvk_physical_device *device,
    device->vk.supported_sync_types = device->sync_types;
    for (int _i = 0; _i < 8; _i++) {
       const struct vk_sync_type *_t = device->vk.supported_sync_types[_i];
-      fprintf(stderr, "[SYNC] supported[%d]=%p", _i, (const void *)_t);
-      if (!_t) { fprintf(stderr, " (end)\n"); break; }
-      fprintf(stderr, " feat=0x%x size=%zu init=%p signal=%p wait_many=%p imp_sf=%p exp_sf=%p\n",
-              (unsigned)_t->features, (size_t)_t->size, (void *)_t->init, (void *)_t->signal,
-              (void *)_t->wait_many, (void *)_t->import_sync_file, (void *)_t->export_sync_file);
+      (void)0;
+      if (!_t) { (void)0; break; }
+      (void)0;
    }
 
 
@@ -1330,7 +1324,7 @@ panvk_physical_device_init_kbase(struct panvk_physical_device *device,
    if (result != VK_SUCCESS)
       goto fail_kbase;
 
-   PANVK_TRACE_PRINTF( "[TRACE] before get_device_sync_types_kbase\n");
+   (void)0;
    result = get_device_sync_types_kbase(device, instance);
    if (result != VK_SUCCESS)
       goto fail_kbase;
@@ -1353,16 +1347,16 @@ panvk_physical_device_init_kbase(struct panvk_physical_device *device,
       vk_warn_non_conformant_implementation("panvk");
 
    struct vk_device_extension_table supported_extensions;
-   PANVK_TRACE_PRINTF( "[TRACE] before get_physical_device_extensions\n");
+   (void)0;
    panvk_arch_dispatch(arch, get_physical_device_extensions, device, instance,
                        &supported_extensions);
-   PANVK_TRACE_PRINTF( "[TRACE] after get_physical_device_extensions\n");
+   (void)0;
 
    struct vk_features supported_features;
-   PANVK_TRACE_PRINTF( "[TRACE] before get_physical_device_features\n");
+   (void)0;
    panvk_arch_dispatch(arch, get_physical_device_features, instance,
                        device, &supported_features);
-   PANVK_TRACE_PRINTF( "[TRACE] after get_physical_device_features\n");
+   (void)0;
 
    struct vk_physical_device_dispatch_table dispatch_table;
    vk_physical_device_dispatch_table_from_entrypoints(
@@ -1377,29 +1371,27 @@ panvk_physical_device_init_kbase(struct panvk_physical_device *device,
    if (result != VK_SUCCESS)
       goto fail_kbase;
 
-   PANVK_TRACE_PRINTF( "[TRACE] before init_shader_caches\n");
+   (void)0;
    init_shader_caches(device, instance);
-   PANVK_TRACE_PRINTF( "[TRACE] after init_shader_caches\n");
+   (void)0;
 
-   PANVK_TRACE_PRINTF( "[TRACE] before get_physical_device_properties\n");
+   (void)0;
    panvk_arch_dispatch(arch, get_physical_device_properties, instance, device,
                        &device->vk.properties);
-   PANVK_TRACE_PRINTF( "[TRACE] after get_physical_device_properties\n");
+   (void)0;
 
    device->vk.supported_sync_types = device->sync_types;
    for (int _i = 0; _i < 8; _i++) {
       const struct vk_sync_type *_t = device->vk.supported_sync_types[_i];
-      fprintf(stderr, "[SYNC] kbase supported[%d]=%p", _i, (const void *)_t);
-      if (!_t) { fprintf(stderr, " (end)\n"); break; }
-      fprintf(stderr, " feat=0x%x size=%zu init=%p signal=%p wait_many=%p imp_sf=%p exp_sf=%p\n",
-              (unsigned)_t->features, (size_t)_t->size, (void *)_t->init, (void *)_t->signal,
-              (void *)_t->wait_many, (void *)_t->import_sync_file, (void *)_t->export_sync_file);
+      (void)0;
+      if (!_t) { (void)0; break; }
+      (void)0;
    }
 
 
-   PANVK_TRACE_PRINTF( "[TRACE] before panvk_wsi_init\n");
+   (void)0;
    result = panvk_wsi_init(device);
-   PANVK_TRACE_PRINTF( "[TRACE] after panvk_wsi_init, result=%d\n", result);
+   (void)0;
    if (result != VK_SUCCESS)
       goto fail_kbase;
 

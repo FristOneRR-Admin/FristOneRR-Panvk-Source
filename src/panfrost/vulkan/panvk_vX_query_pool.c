@@ -194,7 +194,7 @@ v58c_fake_occlusion(void)
       const char *e = getenv("PANVK_FAKE_OCCLUSION");
       v = e && e[0] == '1';
       if (v)
-         dprintf(2, "[OQ] fake occlusion ON: every query reports visible\n");
+         (void)0;
    }
    return v;
 }
@@ -217,9 +217,7 @@ cpu_write_occlusion_query_result(void *dst, uint32_t idx,
          n_zero++;
       if (n_total % 2000 == 0 && n_lines < 30) {
          n_lines++;
-         dprintf(2, "[OQ] read=%u zero=%u (%u%%) cores=%u last=%llu\n", n_total,
-                 n_zero, n_zero * 100 / n_total, core_count,
-                 (unsigned long long)result);
+         (void)0;
       }
    }
    if (v58c_fake_occlusion())
