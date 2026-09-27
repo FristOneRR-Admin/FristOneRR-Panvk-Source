@@ -50,6 +50,21 @@ static __thread bool v9_tess_flip_ff;
 #include "vk_meta.h"
 #include "vk_pipeline_layout.h"
 
+/* PANVK_NO_SMC=1 disables shader_modifies_coverage (debug A/B) */
+#include <stdio.h>
+#include <stdlib.h>
+static __attribute__((unused)) bool
+v61a_no_smc(void)
+{
+   static int v = -1;
+   if (v < 0) {
+      const char *e = getenv("PANVK_NO_SMC");
+      v = (e && atoi(e)) ? 1 : 0;
+      fprintf(stderr, "[SMC] shader_modifies_coverage %s\n", v ? "OFF (PANVK_NO_SMC=1)" : "ON");
+   }
+   return v;
+}
+
 #if PAN_ARCH != 9
 /* TODO(v9): draw-call path (RSD, attribute buffers, indirect varying
  * bufs) not yet implemented for arch 9 -- needs a from-scratch MVS/SPD
@@ -2331,6 +2346,11 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
             late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
          cfg.flags_0.zs_update_operation =
             late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
+         /* the GPU must wait for the shader's coverage (discard,
+          * sample mask, alpha-to-coverage) before updating depth/stencil. */
+         cfg.flags_0.shader_modifies_coverage = !v61a_no_smc() &&
+            (fs->info.fs.can_discard || fs->info.fs.writes_coverage ||
+             dyns->ms.alpha_to_coverage_enable);
          /* FPK would discard what lies underneath; only allowed when blending
           * doesn't read the destination (and no alpha-to-coverage). */
          cfg.flags_0.allow_forward_pixel_to_kill =
