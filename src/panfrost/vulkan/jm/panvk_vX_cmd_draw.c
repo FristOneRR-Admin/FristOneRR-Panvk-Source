@@ -2220,6 +2220,24 @@ v9_emit_scissor(struct panvk_cmd_buffer *cmdbuf, struct mali_scissor_packed *out
    }
 }
 
+/* PANVK_SKIP_FS workaround (default off): some fragment shaders that spill
+ * registers run past the kernel job timeout (Far Cry 3). 1 = skip draws
+ * whose fragment shader spills (tls > 0), 2 = also skip shaders using 64
+ * registers. Skipped draws are culled, so those objects are missing. */
+static bool
+panvk_skip_fs(unsigned regs, unsigned tls)
+{
+   static int mode = -1;
+
+   if (mode < 0) {
+      const char *e = getenv("PANVK_SKIP_FS");
+      mode = e ? atoi(e) : 0;
+      if (mode)
+         fprintf(stderr, "panvk: PANVK_SKIP_FS=%d\n", mode);
+   }
+   return (mode == 1 && tls > 0) || (mode == 2 && (tls > 0 || regs > 32));
+}
+
 static VkResult
 v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
                           const struct panvk_draw_info *info,
@@ -2342,6 +2360,10 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
             (fs->info.fs.can_discard || fs->info.fs.writes_depth ||
              fs->info.fs.writes_stencil || fs->info.fs.writes_coverage ||
              dyns->ms.alpha_to_coverage_enable);
+         if (panvk_skip_fs(fs->info.work_reg_count, fs->info.tls_size)) {
+            cfg.flags_0.cull_front_face = true;
+            cfg.flags_0.cull_back_face = true;
+         }
          cfg.flags_0.pixel_kill_operation =
             late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
          cfg.flags_0.zs_update_operation =

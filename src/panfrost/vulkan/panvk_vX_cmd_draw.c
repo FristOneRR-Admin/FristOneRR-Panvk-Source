@@ -11,6 +11,7 @@
 
 #include "pan_desc.h"
 #include "pan_util.h"
+#include <stdlib.h>
 
 static enum pan_fb_load_op
 get_att_fb_load_op(const VkRenderingAttachmentInfo *att)
@@ -547,6 +548,46 @@ render_state_set_zs_attachments(struct panvk_cmd_buffer *cmdbuf,
    }
 }
 
+/* DXVK (and others) give attachment-less render passes a renderArea and
+ * layerCount equal to maxFramebufferWidth/Height/Layers. Nothing is stored
+ * in such a pass, but a tiler GPU still walks the whole area in the
+ * fragment job (~460 ms per pass on Mali-G57), so clamp it to the largest
+ * real render size seen so far and to a single layer (no multiview).
+ * PANVK_NOATT_CLAMP=0 disables this. */
+static void
+panvk_clamp_noatt(bool bound, uint32_t *w, uint32_t *h, struct pan_fb_bbox *ra,
+                  uint32_t view_mask, uint32_t *layers)
+{
+   static uint32_t max_w, max_h;
+   static int enabled = -1;
+
+   if (bound) {
+      max_w = MAX2(max_w, *w);
+      max_h = MAX2(max_h, *h);
+      return;
+   }
+
+   if (enabled < 0) {
+      const char *e = getenv("PANVK_NOATT_CLAMP");
+      enabled = !(e && e[0] == '0');
+   }
+   if (!enabled)
+      return;
+
+   *w = MIN2(*w, max_w ? max_w : 4096);
+   *h = MIN2(*h, max_h ? max_h : 4096);
+   if ((int64_t)ra->max_x > (int64_t)*w - 1)
+      ra->max_x = *w - 1;
+   if ((int64_t)ra->max_y > (int64_t)*h - 1)
+      ra->max_y = *h - 1;
+   if ((int64_t)ra->min_x > (int64_t)ra->max_x)
+      ra->min_x = ra->max_x;
+   if ((int64_t)ra->min_y > (int64_t)ra->max_y)
+      ra->min_y = ra->max_y;
+   if (!view_mask && *layers > 1)
+      *layers = 1;
+}
+
 void
 panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
                                       const VkRenderingInfo *pRenderingInfo)
@@ -644,7 +685,7 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
    if (z_att || s_att)
       render_state_set_zs_attachments(cmdbuf, z_att, s_att);
 
-   const struct pan_fb_bbox ra_px =
+   struct pan_fb_bbox ra_px =
       pan_fb_bbox_from_xywh(pRenderingInfo->renderArea.offset.x,
                             pRenderingInfo->renderArea.offset.y,
                             pRenderingInfo->renderArea.extent.width,
@@ -659,6 +700,9 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
    }
    assert(render->fb.layout.width_px > 0 &&
           render->fb.layout.height_px > 0);
+   panvk_clamp_noatt(render->bound_attachments != 0, &render->fb.layout.width_px,
+                     &render->fb.layout.height_px, &ra_px,
+                     pRenderingInfo->viewMask, &render->layer_count);
 
    render->fb.layout.render_area_px = ra_px;
    render->fb.layout.tiling_area_px = ra_px;
