@@ -85,6 +85,14 @@ const struct pan_model pan_model_list[] = {
                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
    VALHALL_MODEL(PAN_PROD_ID(9, 0, 3), 0, "G57",    "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+   VALHALL_MODEL(PAN_PROD_ID(9, 0, 0), 0, "G77",   "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+   VALHALL_MODEL(PAN_PROD_ID(9, 0, 2), 0, "G78",   "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+   VALHALL_MODEL(PAN_PROD_ID(9, 0, 4), 0, "G68",   "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+   VALHALL_MODEL(PAN_PROD_ID(9, 0, 5), 0, "G78AE", "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
    /* Mali-G710 (Odin, e.g. Google Tensor G2 / Pixel 7, GPU_ID 0xa862xxxx).
     * It shares the G710 family rates used by the G610 product below. */
    VALHALL_MODEL(PAN_PROD_ID(10, 8, 2), 0, "G710",   "G710", MODEL_ANISO(ALL),  MODEL_TB_SIZES(32768, 16384),
