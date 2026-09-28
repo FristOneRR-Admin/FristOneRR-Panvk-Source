@@ -59,6 +59,19 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const 
  * just record the atom numbers and hand them to panvk_kbase_sync_set_pending()
  * so a future vk_sync_wait() on queue->sync (or a signal semaphore) does
  * the actual blocking, off the submission's critical path. */
+
+/* v67b: vertex/tiler work overlaps the previous pass (PANVK_OVERLAP=0: off) */
+#include <stdlib.h>
+static __attribute__((unused)) bool
+panvk_overlap_enabled(void)
+{
+   static int on = -1;
+   if (on < 0) {
+      const char *e = getenv("PANVK_OVERLAP");
+      on = !(e && e[0] == '0');
+   }
+   return on;
+}
 static uint64_t
 panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
                          struct panvk_cmd_buffer *cmdbuf,
@@ -104,10 +117,16 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
             queue->warmed_up = true;
          } else {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+            const bool v67_ov = panvk_overlap_enabled() && batch->frag_jc.first_job &&
+                                !queue->in_dep && queue->frag_warmed_up; /* v67b */
             vtc_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req, bos, nr_bos,
-                (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom), BASE_JD_DEP_TYPE_ORDER, queue->in_dep, BASE_JD_DEP_TYPE_ORDER,
+                (v67_ov ? queue->half_frag_atom[batch->heap_half & 1] : /* v67b */
+                 (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom)),
+                BASE_JD_DEP_TYPE_ORDER, v67_ov ? queue->last_vtc_atom : queue->in_dep,
+                BASE_JD_DEP_TYPE_ORDER,
                 batch->frag_jc.first_job != 0 && queue->frag_warmed_up);
             assert(vtc_atom);
+            queue->last_vtc_atom = vtc_atom; /* v67b */
             queue->in_dep = 0;
             queue->last_any_atom = vtc_atom;
 
@@ -167,8 +186,11 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
                                              BASE_JD_REQ_FS, bos, nr_bos,
                                              vtc_atom ? vtc_atom : queue->last_any_atom,
                                              vtc_atom ? BASE_JD_DEP_TYPE_DATA : BASE_JD_DEP_TYPE_ORDER,
-                                             queue->in_dep, BASE_JD_DEP_TYPE_ORDER, false);
+                                             (panvk_overlap_enabled() && vtc_atom && !queue->in_dep)
+                                                ? queue->last_frag_atom : queue->in_dep, /* v67b */
+                                             BASE_JD_DEP_TYPE_ORDER, false);
          assert(frag_atom);
+         queue->half_frag_atom[batch->heap_half & 1] = frag_atom; /* v67b */
          queue->last_frag_atom = frag_atom; queue->last_any_atom = frag_atom;
          if (!vtc_atom) {
             static int fo = 0;

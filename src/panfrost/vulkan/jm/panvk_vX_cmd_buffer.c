@@ -280,6 +280,19 @@ panvk_per_arch(cmd_alloc_tls_desc)(struct panvk_cmd_buffer *cmdbuf, bool gfx)
    return VK_SUCCESS;
 }
 
+/* v67b: vertex/tiler work overlaps the previous pass (PANVK_OVERLAP=0: off) */
+#include <stdlib.h>
+static __attribute__((unused)) bool
+panvk_overlap_enabled(void)
+{
+   static int on = -1;
+   if (on < 0) {
+      const char *e = getenv("PANVK_OVERLAP");
+      on = !(e && e[0] == '0');
+   }
+   return on;
+}
+
 VkResult
 panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
                                           uint32_t layer_idx)
@@ -312,6 +325,15 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
       cfg.base = dev->tiler_heap->addr.dev;
       cfg.bottom = dev->tiler_heap->addr.dev;
       cfg.top = cfg.base + cfg.size;
+      if (panvk_overlap_enabled()) { /* v67b */
+         static unsigned next_half;
+         batch->heap_half = __atomic_fetch_add(&next_half, 1, __ATOMIC_RELAXED) & 1;
+         const uint64_t half = (uint64_t)cfg.size / 2;
+         cfg.size = half;
+         cfg.base += batch->heap_half * half;
+         cfg.bottom = cfg.base;
+         cfg.top = cfg.base + half;
+      }
    }
 
    pan_pack(&batch->tiler.ctx_templ, TILER_CONTEXT, cfg) {

@@ -31,7 +31,22 @@
 #include "vk_log.h"
 #include "vk_object.h"
 #include "vk_util.h"
+#include <stdlib.h>
 
+
+/* On JM GPUs (Mali-G57 ...) behind kbase our AFBC path is slower than plain
+ * tiled images (Far Cry 3: +2-3 FPS without it), so AFBC is off there unless
+ * PANVK_AFBC=1. */
+static bool
+panvk_jm_afbc_enabled(void)
+{
+   static int on = -1;
+   if (on < 0) {
+      const char *e = getenv("PANVK_AFBC");
+      on = e && e[0] == '1';
+   }
+   return on;
+}
 bool
 panvk_image_can_use_afbc(
    struct panvk_physical_device *phys_dev, VkFormat fmt,
@@ -63,7 +78,7 @@ panvk_image_can_use_afbc(
    if (fmt == VK_FORMAT_R8_UNORM)
       return false; /* fontatlas4: DXVK font atlas stays linear */
 
-   return !PANVK_DEBUG(NO_AFBC) &&
+   return !PANVK_DEBUG(NO_AFBC) && (arch >= 10 || panvk_jm_afbc_enabled()) &&
           !(usage &
             (VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT)) &&
           pan_query_afbc(&phys_dev->kmod.dev->props) &&
@@ -225,7 +240,7 @@ panvk_image_can_use_mod(struct panvk_image *image,
          return false; /* fontatlas5: DXVK font atlas stays linear */
 
       /* AFBC explicitly disabled. */
-      if (PANVK_DEBUG(NO_AFBC))
+      if (PANVK_DEBUG(NO_AFBC) || (arch < 10 && !panvk_jm_afbc_enabled()))
          return false;
 
       /* Can't do AFBC if store/host copy is requested. */

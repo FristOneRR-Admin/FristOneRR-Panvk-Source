@@ -62,6 +62,8 @@ struct panvk_batch {
    bool issued;
    /* libpoly heap bottom reset already queued in this batch */
    bool poly_heap_reset;
+   /* v67b: tiler heap half used by this batch */
+   unsigned heap_half;
 };
 
 enum panvk_cmd_event_op_type {
