@@ -113,6 +113,22 @@ struct base_jd_atom {
    __u8 padding[15]; /* pad struct to 64 bytes total; this kernel rejects any other JOB_SUBMIT stride */
 };
 
+/* Some kbase builds (e.g. r49 on 6.6 kernels) expect a 56-byte atom
+ * stride instead of 64. PANVK_ATOM_STRIDE overrides the default. */
+static unsigned
+kbase_atom_stride(void)
+{
+   static unsigned stride;
+   if (!stride) {
+      const char *e = getenv("PANVK_ATOM_STRIDE");
+      unsigned v = e ? (unsigned)atoi(e) : 0;
+      stride = (v == 48 || v == 56 || v == 64) ? v : 64;
+      if (e)
+         fprintf(stderr, "[FristOneRR] atom stride = %u\n", stride);
+   }
+   return stride;
+}
+
 #define BASE_JD_REQ_FS                    (1u << 0)
 #define BASE_JD_REQ_CS                    (1u << 1)
 #define BASE_JD_REQ_T                      (1u << 2)
@@ -2448,7 +2464,7 @@ kbase_kmod_job_submit(struct pan_kmod_dev *dev,
    struct kbase_ioctl_job_submit sub = {
       .addr = (uint64_t)(uintptr_t)&atom,
       .nr_atoms = 1,
-      .stride = sizeof(atom),
+      .stride = kbase_atom_stride(),
    };
    if (ioctl(dev->fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
       mesa_loge("kbase: JOB_SUBMIT err=%d", errno);
@@ -2499,7 +2515,7 @@ kbase_kmod_job_submit_dep(struct pan_kmod_dev *dev, uint64_t jc, uint32_t core_r
    struct kbase_ioctl_job_submit sub = {
       .addr = (uint64_t)(uintptr_t)&atom,
       .nr_atoms = 1,
-      .stride = sizeof(atom),
+      .stride = kbase_atom_stride(),
    };
    (void)0;
    if (ioctl(dev->fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
