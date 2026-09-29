@@ -17,3 +17,18 @@ test5a_compute_buffer
 test5b_compute_dispatch
 minimal_graphics_test
 termux-box/
+
+# FristOneRR: local work files (not part of the driver source)
+__pycache__/
+*.pyc
+*.bak
+*.bak[-_.]*
+*.backup*
+*.before*
+*.log
+/icd/
+/panvk_driver/
+/*.zip
+/panvk_sphere_real*
+/test_triangle*
+/build-*/

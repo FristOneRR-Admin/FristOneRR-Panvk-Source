@@ -1,2 +1,0 @@
-'DISPLAY' environment variable not set... skipping surface info
-WARNING: panvk is not a conformant Vulkan implementation, testing use only.
