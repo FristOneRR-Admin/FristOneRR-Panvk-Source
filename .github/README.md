@@ -142,6 +142,7 @@ ninja -C build-android-final
 | **Noysz** / [panvk-g99-jm](https://github.com/Noysz/panvk-g99-jm) | Valhall v9 / Job Manager groundwork (in the base); reference for the v9 draw path |
 | **Vtgamer998** (MESA-KMOD) | kbase kernel-interface work (see note ¹ under the table) |
 | **mexicanbr0auth** / [mesa-panvk-g57](https://github.com/mexicanbr0auth/mesa-panvk-g57) | PanVK/kbase work for Mali-G57. Parts of our code match this project and most likely came from it during development (see table) |
+| **wonderkast02** / [panvk-g720-kbase-csf](https://github.com/wonderkast02/panvk-g720-kbase-csf) | Community PanVK-over-kbase work (Mali-G720, CSF) |
 | **LukeValen** / [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) | Mali-G52 research |
 | **BossDrk** | Mali-G52 testing (stride fix) |
 | **Claude** (AI assistant by Anthropic) | Development help, debugging and code review; audited the code origin and helped write this credit list |
