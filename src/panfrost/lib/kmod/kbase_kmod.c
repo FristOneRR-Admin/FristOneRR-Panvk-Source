@@ -115,18 +115,19 @@ struct base_jd_atom {
 
 /* Some kbase builds (e.g. r49 on 6.6 kernels) expect a 56-byte atom
  * stride instead of 64. PANVK_ATOM_STRIDE overrides the default. */
+static unsigned g_atom_stride;
+
 static unsigned
 kbase_atom_stride(void)
 {
-   static unsigned stride;
-   if (!stride) {
+   if (!g_atom_stride) {
       const char *e = getenv("PANVK_ATOM_STRIDE");
       unsigned v = e ? (unsigned)atoi(e) : 0;
-      stride = (v == 48 || v == 56 || v == 64) ? v : 64;
+      g_atom_stride = (v == 48 || v == 56 || v == 64) ? v : 64;
       if (e)
-         fprintf(stderr, "[FristOneRR] atom stride = %u\n", stride);
+         dprintf(2, "[FristOneRR] atom stride = %u\n", g_atom_stride);
    }
-   return stride;
+   return g_atom_stride;
 }
 
 #define BASE_JD_REQ_FS                    (1u << 0)
@@ -1221,6 +1222,44 @@ kbase_kmod_alias_destroy(struct pan_kmod_dev *dev, uint64_t va, uint64_t size,
    munmap((void *)(uintptr_t)va, size * nents);
 }
 
+
+/* Probe the JOB_SUBMIT atom stride once per process: submit an empty
+ * dependency-only atom (no GPU work) with stride 64. Kernels that expect
+ * 56 (e.g. r49 on 6.6) answer with a config fault (0x40) or reject the
+ * ioctl; then we switch to 56. PANVK_ATOM_STRIDE always wins. */
+static void
+kbase_probe_atom_stride(int fd)
+{
+   if (g_atom_stride || getenv("PANVK_ATOM_STRIDE")) {
+      (void)kbase_atom_stride();
+      return;
+   }
+
+   struct base_jd_atom atom = { .atom_number = 255, .core_req = 0 };
+   struct kbase_ioctl_job_submit sub = {
+      .addr = (uint64_t)(uintptr_t)&atom,
+      .nr_atoms = 1,
+      .stride = 64,
+   };
+   unsigned result = 64;
+
+   if (ioctl(fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
+      result = 56;
+   } else {
+      struct pollfd pfd = { .fd = fd, .events = POLLIN };
+      if (poll(&pfd, 1, 1000) > 0) {
+         struct base_jd_event_v2 ev = { 0 };
+         if (read(fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev) &&
+             (ev.event_code & BASE_JD_EVENT_ERR_MASK))
+            result = 56;
+      }
+   }
+
+   g_atom_stride = result;
+   if (result != 64)
+      dprintf(2, "[FristOneRR] atom stride auto-detected: %u\n", result);
+}
+
 static struct pan_kmod_dev *
 kbase_kmod_dev_create(int fd, uint32_t flags,
                       UNUSED const struct pan_kmod_driver *drv_info,
@@ -1267,6 +1306,9 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
       mesa_loge("kbase: KBASE_IOCTL_SET_FLAGS failed: %s", strerror(errno));
       return NULL;
    }
+
+   if (!is_csf)
+      kbase_probe_atom_stride(fd);
 
    /* Empirically, this Mali-G57 kbase JM backend needs ~2s of real
     * wall-clock time after context creation before the GPU power domain
