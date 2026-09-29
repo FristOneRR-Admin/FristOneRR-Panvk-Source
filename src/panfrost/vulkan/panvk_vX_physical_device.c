@@ -1378,13 +1378,12 @@ panvk_per_arch(get_physical_device_properties)(
 
    snprintf(properties->driverName, VK_MAX_DRIVER_NAME_SIZE, "panvk");
    snprintf(properties->driverInfo, VK_MAX_DRIVER_INFO_SIZE,
-            "FristOneRR " FRISTONERR_VERSION " (Mesa " PACKAGE_VERSION ")"
-            MESA_GIT_SHA1);
+            "FristOneRR " FRISTONERR_VERSION " (Mesa " PACKAGE_VERSION ")");
    {
       static bool logged;
       if (!logged) {
          logged = true;
-         dprintf(2, "%s\n", properties->driverInfo);
+         dprintf(2, "%s%s\n", properties->driverInfo, MESA_GIT_SHA1);
       }
    }
 
