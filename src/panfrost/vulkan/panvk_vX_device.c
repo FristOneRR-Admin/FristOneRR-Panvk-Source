@@ -641,7 +641,16 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
 #endif
    /* Device-global libpoly bump heap.  The command stream resets the atomic
     * bottom pointer once before its first software-poly draw. */
-   const uint64_t poly_heap_size = 128ull * 1024 * 1024;
+   /* The libpoly heap is only touched by software geometry/tessellation
+    * draws, but it is fully committed.  128 MB per VkDevice was a large
+    * share of RAM on 4-6 GB phones; default to 16 MB, overridable. */
+   uint64_t poly_heap_mb = 16;
+   {
+      const char *e = getenv("PANVK_POLY_HEAP_MB");
+      if (e && atoi(e) >= 4 && atoi(e) <= 512)
+         poly_heap_mb = atoi(e);
+   }
+   const uint64_t poly_heap_size = poly_heap_mb * 1024 * 1024;
    result = panvk_priv_bo_create(
       device, poly_heap_size,
       panvk_device_adjust_bo_flags(device, PAN_KMOD_BO_FLAG_WB_MMAP),
