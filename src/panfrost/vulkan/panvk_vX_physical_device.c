@@ -17,7 +17,7 @@
 #include <stdio.h>
 
 #ifndef FRISTONERR_VERSION
-#define FRISTONERR_VERSION "v72"
+#define FRISTONERR_VERSION "beta 1.1.0"
 #endif
 
 #include "vk_android.h"
