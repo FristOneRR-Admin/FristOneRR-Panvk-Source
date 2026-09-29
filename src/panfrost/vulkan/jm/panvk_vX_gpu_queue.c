@@ -112,8 +112,16 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
    if (batch->vtc_jc.first_job) {
          if (unlikely(!queue->warmed_up)) {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
-            (void)0;
-            (void)0;
+            /* The first vertex/tiler/compute chain must be submitted too
+             * (it can be a buffer upload the app relies on). Submit it
+             * synchronously, the same way the first fragment job is. */
+            if (queue->in_dep) {
+               kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1);
+               queue->in_dep = 0;
+            }
+            kbase_kmod_job_submit_retry(dev->kmod.dev, batch->vtc_jc.first_job,
+                                        vtc_core_req, bos, nr_bos, NULL, 0, 5);
+            vtc_atom = 0; /* already waited for */
             queue->warmed_up = true;
          } else {
          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
