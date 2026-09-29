@@ -1101,6 +1101,10 @@ get_gpu_model(struct panvk_physical_device *device,
 
    *unknown_gpu = false;
    device->model = pan_get_model(props->gpu_id, props->gpu_variant);
+   /* Some kbase kernels report a non-zero gpu_variant (e.g. G52 r1 on
+    * Helio G85) while the model table only lists variant 0. */
+   if (!device->model && props->gpu_variant)
+      device->model = pan_get_model(props->gpu_id, 0);
    if (device->model)
       return VK_SUCCESS;
 
