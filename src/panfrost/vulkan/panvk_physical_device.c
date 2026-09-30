@@ -524,9 +524,34 @@ get_device_heaps(struct panvk_physical_device *device,
    int host_coherent_not_cached_idx = -1;
    int host_cached_not_coherent_idx = -1;
 
-   const uint64_t heap_size =
+   uint64_t heap_size =
       os_get_gpu_heap_size(instance->drirc.misc.heap_memory_percent,
                            &instance->drirc.misc.heap_memory_percent);
+
+   /* FristOneRR: phones share RAM with Android; reporting ~75% of RAM
+    * makes DXVK/games allocate until Android kills the app. Report 25% of
+    * RAM, clamped to 1..3 GiB. PANVK_HEAP_MB overrides. */
+   {
+      const uint64_t MiB = 1024ull * 1024ull;
+      uint64_t total_ram = 0;
+      uint64_t want = heap_size;
+      if (os_get_total_physical_memory(&total_ram) && total_ram) {
+         want = total_ram / 4;
+         want = CLAMP(want, 1024ull * MiB, 3072ull * MiB);
+      }
+      const char *e = getenv("PANVK_HEAP_MB");
+      if (e && atoi(e) >= 256 && atoi(e) <= 16384)
+         want = (uint64_t)atoi(e) * MiB;
+      if (want && (want < heap_size || (e && atoi(e) >= 256)))
+         heap_size = want;
+      static bool logged;
+      if (!logged) {
+         logged = true;
+         fprintf(stderr, "[FristOneRR] GPU heap: %llu MB (RAM %llu MB)\n",
+                 (unsigned long long)(heap_size / MiB),
+                 (unsigned long long)(total_ram / MiB));
+      }
+   }
 
    device->memory.heap_count = 1;
    device->memory.heaps[0] = (VkMemoryHeap){
