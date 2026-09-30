@@ -26,7 +26,7 @@ which lines match other projects:
 |---|---:|---|
 | [mexicanbr0auth/mesa-panvk-g57](https://github.com/mexicanbr0auth/mesa-panvk-g57) | 60 (3.6 %) | v9 draw path `jm/panvk_vX_cmd_draw.c` (35), `kbase_kmod.c` (12), `jm/panvk_vX_cmd_dispatch.c` (6), others (7) |
 | [Noysz/panvk-g99-jm](https://github.com/Noysz/panvk-g99-jm) | 40 (2.4 %) | v9 draw path `jm/panvk_vX_cmd_draw.c` (15), `kbase_kmod.c` (9), `jm/panvk_vX_cmd_dispatch.c` (7), `libpan/draw_helper.cl` (6), others (3) |
-| [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) (LukeValen) | 11 (0.7 %) | `kbase_kmod.c` (11) |
+| [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) (BossDrk) | 11 (0.7 %) | `kbase_kmod.c` (11) |
 
 Most of the matches in `kbase_kmod.c` are kbase interface definitions (for example
 `struct base_jd_event_v2` and `BASE_JD_EVENT_DONE`) that every kbase project copies from Arm's
@@ -78,7 +78,7 @@ base itself or in other public PanVK/kbase projects.
 | Elsewhere in the funnymdzz base (code we moved or reused) | 468 | 28.0 % |
 | [mexicanbr0auth/mesa-panvk-g57](https://github.com/mexicanbr0auth/mesa-panvk-g57) | 60 | 3.6 % |
 | [Noysz/panvk-g99-jm](https://github.com/Noysz/panvk-g99-jm) | 40 | 2.4 % |
-| [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) (LukeValen) | 11 | 0.7 % |
+| [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) (BossDrk) | 11 | 0.7 % |
 | [Vtgamer998/PanVK-v9-Driver](https://github.com/Vtgamer998/PanVK-v9-Driver) | 0 | 0.0 % |
 | MESA-KMOD (Vtgamer998) ¹ | — | ≈ 4.5 % |
 | **Not found in the base or in any project above** | **1,119** | **67.0 %** |
@@ -116,6 +116,7 @@ python3 tools/fristonerr/code_origin.py                             # re-run the
 - DXVK support: robustness2 / nullDescriptor on v9, extension and feature fixes
 - GPU model table: G52 r1 lookup, G68, G77, G78
 - Lower RAM use (smaller libpoly heap)
+- 1.2.0: submit the first vertex/tiler/compute job of a queue (it was dropped, which broke DXVK 2.x D3D11); GPU heap sized to 25 % of RAM (1–3 GiB, `PANVK_HEAP_MB`); short driverInfo for the DXVK HUD
 
 ---
 
@@ -135,16 +136,18 @@ ninja -C build-android-final
 
 ## Credits
 
+> **Correction (1.2.0):** the 0x8055/panvk-g52-oppo-a38 repository belongs to **BossDrk**, not LukeValen as written in 1.1.0.
+
 | Who | Contribution |
 |---|---|
 | **Mesa / PanVK developers** (Collabora, Arm and contributors) | PanVK itself |
-| **funnymdzz** & **leegao** | The Mesa fork we started from; bionic Vulkan wrapper; advice |
+| **funnymdzz** & **leegao** | The Mesa fork we started from; [bionic-vulkan-wrapper](https://github.com/leegao/bionic-vulkan-wrapper) (base of [FristOneRR-Wrapperv1](https://github.com/FristOneRR-Admin/FristOneRR-Wrapperv1)); advice |
 | **Noysz** / [panvk-g99-jm](https://github.com/Noysz/panvk-g99-jm) | Valhall v9 / Job Manager groundwork (in the base); reference for the v9 draw path |
 | **Vtgamer998** (MESA-KMOD) | kbase kernel-interface work (see note ¹ under the table) |
 | **mexicanbr0auth** / [mesa-panvk-g57](https://github.com/mexicanbr0auth/mesa-panvk-g57) | PanVK/kbase work for Mali-G57. Parts of our code match this project and most likely came from it during development (see table) |
 | **wonderkast02** / [panvk-g720-kbase-csf](https://github.com/wonderkast02/panvk-g720-kbase-csf) | Community PanVK-over-kbase work (Mali-G720, CSF) |
-| **LukeValen** / [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) | Mali-G52 research |
-| **BossDrk** | Mali-G52 testing (stride fix) |
+| **BossDrk** / [0x8055/panvk-g52-oppo-a38](https://github.com/0x8055/panvk-g52-oppo-a38) | Mali-G52 (Oppo A38) research and testing (stride fix) |
+| **LukeValen** | Mali-G52 research |
 | **Claude** (AI assistant by Anthropic) | Development help, debugging and code review; audited the code origin and helped write this credit list |
 | **Community testers** | Device reports and logs via Issues |
 

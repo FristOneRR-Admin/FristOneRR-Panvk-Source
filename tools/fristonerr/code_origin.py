@@ -28,7 +28,7 @@ PROJECTS = {
     "Vtgamer998/PanVK-v9-Driver": (
         "https://github.com/Vtgamer998/PanVK-v9-Driver.git",
         ["src/panfrost", "src/vulkan", "include", "patches"]),
-    "0x8055/panvk-g52-oppo-a38 (LukeValen)": (
+    "0x8055/panvk-g52-oppo-a38 (BossDrk)": (
         "https://github.com/0x8055/panvk-g52-oppo-a38.git", None),
 }
 
