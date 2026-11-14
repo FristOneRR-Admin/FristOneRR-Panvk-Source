@@ -12,7 +12,7 @@ Driver releases, the compatibility list and install guide are here:
 
 This is my first project on GitHub, and I made a mistake. When I released beta 1.0.0 I didn't
 credit everyone whose work ended up in the driver. I'm sorry, especially to **Noysz**,
-**mexicanbr0auth** and **LukeValen**.
+**mexicanbr0auth**
 
 During three months of development I studied and tested other PanVK/kbase projects, and some
 of their code ended up in my source tree. My working copy was also overwritten from other
